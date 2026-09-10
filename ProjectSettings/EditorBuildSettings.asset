@@ -5,9 +5,15 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 1
-    path: Assets/Scenes/SampleScene.unity
+  - enabled: 0
+    path: Assets/KINOVR/Scenes/SampleScene.unity
     guid: 99c9720ab356a0642a771bea13969a05
+  - enabled: 0
+    path: Assets/Samples/Meta XR Core SDK/205.0.0/Sample Scenes/HandTrackingWideMotionMode.unity
+    guid: c7c3338eb038b184f954cd3986290de6
+  - enabled: 1
+    path: Assets/KINOVR/Scenes/KINO_VR_Game.unity
+    guid: 28770b652200f8845aa7786000ee6f19
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
     com.unity.xr.management.loader_settings: {fileID: 11400000, guid: 3e1e976ed233f554db4d206f5e1e96c8, type: 2}
