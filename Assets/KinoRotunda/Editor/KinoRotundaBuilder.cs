@@ -69,6 +69,8 @@ namespace KinoRotunda.Editor
                     case "interior-lighting": KinoInteriorLighting.Apply(); break;
                     case "stage-lighting": KinoInteriorLighting.ApplyStage(); break;
                     case "stage-preview": KinoInteriorLighting.FinishStage(); break;
+                    case "blue-marble": KinoMarbleFinish.Apply(); break;
+                    case "marble-controls": KinoMarbleControls.SelectMaterial(); break;
                     default: throw new ArgumentException("Unknown KINO editor command: " + command);
                 }
             }
