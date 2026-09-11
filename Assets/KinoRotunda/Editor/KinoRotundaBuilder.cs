@@ -42,6 +42,10 @@ namespace KinoRotunda.Editor
 
         static void Poll()
         {
+            // A manual handoff lets an in-flight light bake finish without replacing
+            // reflection settings that the user is now editing.
+            if (File.Exists("Temp/KinoRotunda.manual-control"))
+                SessionState.SetBool("KinoRotunda.Baking", false);
             if (busy || EditorApplication.isCompiling || EditorApplication.isUpdating || EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.timeSinceStartup < nextPoll) return;
             nextPoll = EditorApplication.timeSinceStartup + 1;
             if (!File.Exists(Request)) return;
@@ -59,6 +63,8 @@ namespace KinoRotunda.Editor
                     case "validate-balls": KinoRotundaBallImport.ValidateImportedBalls(); Status("BALLS_VALIDATED"); break;
                     case "reflections": BakeReflections(); Capture(); Validate(); Status("REFLECTIONS_READY"); break;
                     case "finish": FinishAppearance(); break;
+                    case "reference-lighting": KinoReferenceLighting.Apply(); break;
+                    case "lighting-audit": KinoReferenceLighting.Audit(); Status("LIGHTING_AUDITED"); break;
                     default: throw new ArgumentException("Unknown KINO editor command: " + command);
                 }
             }
@@ -196,6 +202,7 @@ namespace KinoRotunda.Editor
             SaveAsset(lighting, Root + "/Settings/KinoLighting.asset");
             Lightmapping.lightingSettings = AssetDatabase.LoadAssetAtPath<LightingSettings>(Root + "/Settings/KinoLighting.asset");
             LightmapSettings.lightmapsMode = LightmapsMode.NonDirectional;
+            KinoReferenceLighting.Configure();
             PrefabUtility.SaveAsPrefabAsset(root, Root + "/Prefabs/KinoRotunda.prefab");
             EditorSceneManager.SaveScene(scene, ScenePath);
             var builds = EditorBuildSettings.scenes.Where(s => s.path != ScenePath).ToList();
@@ -265,6 +272,7 @@ namespace KinoRotunda.Editor
             screen.EnableKeyword("_EMISSION");screen.SetColor("_EmissionColor",Color.white*1.35f);
             screen.globalIlluminationFlags=MaterialGlobalIlluminationFlags.BakedEmissive;
             foreach(var m in materials.Values)EditorUtility.SetDirty(m);
+            KinoReferenceLighting.ConfigureMaterials();
             AssetDatabase.SaveAssets();return materials;
         }
 
@@ -365,10 +373,11 @@ namespace KinoRotunda.Editor
         static void FinishAppearance()
         {
             MakeMaterials();
+            KinoReferenceLighting.Configure();
             var p=AssetDatabase.LoadAssetAtPath<VolumeProfile>(Root+"/Settings/KinoAtmosphere.asset");
             if(p.TryGet<Bloom>(out var bloom))
             {
-                bloom.threshold.Override(.9f);bloom.intensity.Override(.55f);bloom.scatter.Override(.70f);EditorUtility.SetDirty(bloom);
+                bloom.threshold.Override(1);bloom.intensity.Override(.32f);bloom.scatter.Override(.68f);EditorUtility.SetDirty(bloom);
             }
             EditorUtility.SetDirty(p);AssetDatabase.SaveAssets();
             if(Camera.main)SceneView.lastActiveSceneView?.AlignViewToObject(Camera.main.transform);
@@ -380,6 +389,7 @@ namespace KinoRotunda.Editor
         {
             if(SceneManager.GetActiveScene().path!=ScenePath)throw new InvalidOperationException("Open the KINO scene first.");
             if(Lightmapping.isRunning)return;
+            if(File.Exists("Temp/KinoRotunda.manual-control"))File.Delete("Temp/KinoRotunda.manual-control");
             EditorSceneManager.SaveScene(SceneManager.GetActiveScene());
             SessionState.SetBool("KinoRotunda.Baking",true);
             Status("BAKING");
@@ -388,14 +398,16 @@ namespace KinoRotunda.Editor
 
         static void BakeCompleted()
         {
+            if(File.Exists("Temp/KinoRotunda.manual-control")){SessionState.SetBool("KinoRotunda.Baking",false);return;}
             if(!SessionState.GetBool("KinoRotunda.Baking",false)||completingBake)return;
             SessionState.SetBool("KinoRotunda.Baking",false);completingBake=true;
             EditorApplication.delayCall+=()=>
             {
                 try
                 {
+                    if(File.Exists("Temp/KinoRotunda.manual-control"))return;
                     EditorSceneManager.SaveScene(SceneManager.GetActiveScene());
-                    BakeReflections();Capture();Validate();Status("COMPLETE — lighting, reflections and preview saved");
+                    BakeReflections();Capture();Validate();KinoReferenceLighting.Audit();Status("COMPLETE — lighting, reflections and preview saved");
                 }
                 catch(Exception e){Status("ERROR after bake: "+e);Debug.LogException(e);}
                 finally{completingBake=false;}
@@ -407,7 +419,7 @@ namespace KinoRotunda.Editor
         {
             foreach(var probe in Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None))
             {
-                string label=probe.name.Contains("Centre")?"Centre":"Display";
+                string label=probe.name.Contains("Centre")?"Centre":probe.name.Contains("Floor")?"Floor":"Display";
                 string path=Root+"/Settings/Reflection_"+label+".exr";
                 probe.mode=ReflectionProbeMode.Baked;
                 if(!Lightmapping.BakeReflectionProbe(probe,path))throw new InvalidOperationException("Reflection probe bake failed: "+label);
