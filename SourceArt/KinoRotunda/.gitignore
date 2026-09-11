@@ -1,0 +1,3 @@
+# Blender's local rolling backup; the primary .blend is the source asset.
+*.blend1
+*.blend2
