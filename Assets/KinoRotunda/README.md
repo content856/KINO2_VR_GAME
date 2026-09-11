@@ -37,6 +37,16 @@ The architecture is static and has simplified floor, stage and perimeter collisi
 
 The column repair retains the existing baked lighting. Rebake lighting when updating the scene's illumination to account for the moved column surfaces.
 
+### Interior illumination pass
+
+`Tools > KINO Rotunda > 7 - Brighten interior (preserve reflection setup)` brightens the existing scene without running the environment or reference-appearance rebuild. It retains the current HDRI and every reflection probe setting, including disabled probes and cubemap assignments. The separate `CeilingLED` material strengthens only the circular ceiling strips. A named lighting group adds 52 tangent area lights around three ceiling rings, eight broad arcade fills, and a subtle cool ceiling bounce. All 61 added lights are baked; no additional realtime lights or geometry are introduced. Repeating the command updates this group without duplicating lights.
+
+The command saves a scene backup and before/after probe reports in `Artifacts/KinoRotunda/InteriorLighting`. This pass does not regenerate the custom reflection cubemaps: their contents remain available for the user's own reflection work. The scene contains the added lighting; a new full environment rebuild or reuse of the older environment prefab requires running the interior pass again.
+
+Unity previews now render through a floating-point HDR target before conversion to PNG, so bright LED emission reaches bloom before it is tone-mapped.
+
+`Tools > KINO Rotunda > 8 - Brighten display wall and draw ornament` adds two baked wall softboxes and a baked ornament fill. The existing display spotlight becomes Mixed so the metallic ornament receives a direct specular highlight; this is one realtime direct spotlight alongside the baked lighting. Screen graphics, ceiling lighting, HDRI and reflection settings are preserved. The scene backup, room previews, close-ups and probe comparisons are saved under `Artifacts/KinoRotunda/StageLighting`.
+
 ## Verification output
 
 `Artifacts/KinoRotunda` contains the Blender and Unity validation reports, skybox identity comparison, render-device information, build logs and the rendered Unity preview. Use `Tools > KINO Rotunda > 5 - Validate environment` to check model scale, UV channels and material assignments after changing the model.

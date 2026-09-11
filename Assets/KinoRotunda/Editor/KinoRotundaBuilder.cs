@@ -65,6 +65,10 @@ namespace KinoRotunda.Editor
                     case "finish": FinishAppearance(); break;
                     case "reference-lighting": KinoReferenceLighting.Apply(); break;
                     case "lighting-audit": KinoReferenceLighting.Audit(); Status("LIGHTING_AUDITED"); break;
+                    case "interior-inspect": KinoInteriorLighting.Inspect(); Status("INTERIOR_INSPECTED"); break;
+                    case "interior-lighting": KinoInteriorLighting.Apply(); break;
+                    case "stage-lighting": KinoInteriorLighting.ApplyStage(); break;
+                    case "stage-preview": KinoInteriorLighting.FinishStage(); break;
                     default: throw new ArgumentException("Unknown KINO editor command: " + command);
                 }
             }
@@ -443,7 +447,11 @@ namespace KinoRotunda.Editor
             var modes=lights.Select(l=>l.lightmapBakeType).ToArray();
             var shadows=lights.Select(l=>l.shadows).ToArray();
             var previous=RenderTexture.active;var target=camera.targetTexture;
-            var rt=RenderTexture.GetTemporary(1920,1080,24,RenderTextureFormat.ARGB32,RenderTextureReadWrite.sRGB);
+            bool previousSrgbWrite=GL.sRGBWrite;
+            // URP 17 inherits its intermediate color format from the target texture.
+            // An LDR target clips LED emission before bloom, even with camera HDR on.
+            var rt=RenderTexture.GetTemporary(1920,1080,24,RenderTextureFormat.ARGBHalf,RenderTextureReadWrite.Linear);
+            var output=RenderTexture.GetTemporary(1920,1080,0,RenderTextureFormat.ARGB32,RenderTextureReadWrite.sRGB);
             var tex=new Texture2D(1920,1080,TextureFormat.RGB24,false,false);
             try
             {
@@ -452,13 +460,16 @@ namespace KinoRotunda.Editor
                 // StandardRequest follows the same volume/post-processing update as
                 // Game view, so bloom and tone mapping are included in the preview.
                 RenderPipeline.SubmitRenderRequest(camera,new RenderPipeline.StandardRequest { destination=rt });
-                RenderTexture.active=rt;tex.ReadPixels(new Rect(0,0,1920,1080),0,0);tex.Apply();
+                GL.sRGBWrite=QualitySettings.activeColorSpace==ColorSpace.Linear;
+                Graphics.Blit(rt,output);
+                RenderTexture.active=output;tex.ReadPixels(new Rect(0,0,1920,1080),0,0);tex.Apply();
                 Directory.CreateDirectory(Artifacts);File.WriteAllBytes(Artifacts+"/UnityPreview.png",tex.EncodeToPNG());
             }
             finally
             {
                 for(int i=0;i<lights.Length;i++){lights[i].lightmapBakeType=modes[i];lights[i].shadows=shadows[i];}
-                camera.targetTexture=target;RenderTexture.active=previous;RenderTexture.ReleaseTemporary(rt);Object.DestroyImmediate(tex);
+                GL.sRGBWrite=previousSrgbWrite;
+                camera.targetTexture=target;RenderTexture.active=previous;RenderTexture.ReleaseTemporary(rt);RenderTexture.ReleaseTemporary(output);Object.DestroyImmediate(tex);
             }
         }
 
