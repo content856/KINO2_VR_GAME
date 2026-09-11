@@ -346,7 +346,10 @@ from fix_marble_seams import fix_marble_seams
 fix_marble_seams()
 from remove_rail_caps import remove_rail_caps
 remove_rail_caps()
+from separate_balls import separate_balls
+separate_balls()
 objects = [o for o in scene.objects if o.type == 'MESH']
+bpy.ops.object.select_all(action='SELECT')
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(SOURCE,'KinoRotunda.blend'))
 bpy.ops.export_scene.fbx(filepath=os.path.join(OUT,'KinoRotunda.fbx'),use_selection=True,object_types={'MESH','EMPTY'},global_scale=1.0,apply_unit_scale=True,apply_scale_options='FBX_SCALE_UNITS',axis_forward='-Z',axis_up='Y',use_mesh_modifiers=True,mesh_smooth_type='FACE',use_tspace=True,add_leaf_bones=False,bake_anim=False,path_mode='AUTO')
 triangles=sum(sum(len(p.vertices)-2 for p in o.data.polygons) for o in objects)

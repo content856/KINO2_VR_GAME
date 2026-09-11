@@ -27,6 +27,8 @@ Blender stores geometry, UVs and six semantic surface slots only. It contains no
 
 ## Lighting and runtime use
 
+All 292 rounded gold ornaments are individual mesh objects under `Animation_Balls`, grouped by arcade bay, stage, stage return and armillary. Each `Ball_*__BrushedGold` object has a centred pivot, its original geometry/material/UVs, and an independent transform. The FBX importer and environment builder keep these objects non-static with probe lighting so they can be animated later. The last generator pass, `Tools/KinoRotunda/separate_balls.py`, recreates this hierarchy.
+
 The scene preserves the exact inherited skybox material. Warm sconces, cove illumination, downlights and a broad ceiling fill are baked in Unity; reflection and light probes are saved with the scene. The progressive GPU lightmapper is configured for subsequent bakes.
 
 KINO-specific URP pipeline copies enable HDR and four-sample MSAA. The atmosphere profile supplies restrained bloom and ACES tone mapping. The original pipeline assets remain available, while quality levels point to the KINO copies.

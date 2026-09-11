@@ -56,6 +56,7 @@ namespace KinoRotunda.Editor
                     case "bake": Bake(); break;
                     case "capture": Capture(); Validate(); Status("CAPTURED"); break;
                     case "validate": Validate(); Status("VALIDATED"); break;
+                    case "validate-balls": KinoRotundaBallImport.ValidateImportedBalls(); Status("BALLS_VALIDATED"); break;
                     case "reflections": BakeReflections(); Capture(); Validate(); Status("REFLECTIONS_READY"); break;
                     case "finish": FinishAppearance(); break;
                     default: throw new ArgumentException("Unknown KINO editor command: " + command);
@@ -127,10 +128,11 @@ namespace KinoRotunda.Editor
             {
                 string surface = renderer.name.Split(new[] { "__" }, StringSplitOptions.None).Last();
                 if (materials.TryGetValue(surface, out var mat)) renderer.sharedMaterial = mat;
-                renderer.receiveGI = ReceiveGI.Lightmaps;
+                bool animatedBall = renderer.name.StartsWith("Ball_", StringComparison.Ordinal);
+                renderer.receiveGI = animatedBall ? ReceiveGI.LightProbes : ReceiveGI.Lightmaps;
                 renderer.lightProbeUsage = LightProbeUsage.BlendProbes;
                 renderer.reflectionProbeUsage = ReflectionProbeUsage.BlendProbes;
-                GameObjectUtility.SetStaticEditorFlags(renderer.gameObject, StaticEditorFlags.BatchingStatic | StaticEditorFlags.ContributeGI | StaticEditorFlags.OccludeeStatic | StaticEditorFlags.ReflectionProbeStatic);
+                GameObjectUtility.SetStaticEditorFlags(renderer.gameObject, animatedBall ? 0 : StaticEditorFlags.BatchingStatic | StaticEditorFlags.ContributeGI | StaticEditorFlags.OccludeeStatic | StaticEditorFlags.ReflectionProbeStatic);
                 var so = new SerializedObject(renderer);
                 so.FindProperty("m_ScaleInLightmap").floatValue = surface == "BrushedGold" || surface == "BronzeShadow" ? .24f : surface == "WarmLED" ? .30f : .7f;
                 so.ApplyModifiedPropertiesWithoutUndo();
