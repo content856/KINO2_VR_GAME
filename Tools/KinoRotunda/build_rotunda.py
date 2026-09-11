@@ -350,6 +350,8 @@ from separate_balls import separate_balls
 separate_balls()
 from refine_lottery import refine_lottery
 refine_lottery()
+from add_perimeter_tubes import add_perimeter_tubes
+add_perimeter_tubes()
 objects = [o for o in scene.objects if o.type == 'MESH']
 bpy.ops.object.select_all(action='SELECT')
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(SOURCE,'KinoRotunda.blend'))

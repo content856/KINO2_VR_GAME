@@ -27,14 +27,16 @@ namespace KinoRotunda.Editor
                     throw new System.InvalidOperationException("Invalid animated ball: " + renderer.name);
                 balls.Add(renderer.name);
             }
-            if (balls.Count != 292) throw new System.InvalidOperationException("Expected 292 balls, found " + balls.Count);
+            int tubeBalls = balls.FindAll(n => n.StartsWith("Ball_Tube_", System.StringComparison.Ordinal)).Count;
+            if (balls.Count - tubeBalls != 292 || (tubeBalls != 0 && tubeBalls != 63))
+                throw new System.InvalidOperationException("Expected 292 original balls and zero or 63 tube balls, found " + balls.Count);
             const string output = "Artifacts/KinoRotunda/SeparateBalls";
             System.IO.Directory.CreateDirectory(output);
             System.IO.File.WriteAllText(output + "/unity-validation.json", JsonUtility.ToJson(new BallValidation {
                 balls = balls.Count, independentTransforms = true, centredPivots = true,
                 nonStatic = true, probeLighting = true, materialsAndUVsValid = true
             }, true));
-            Debug.Log("[KinoRotunda] Validated 292 independent, non-static balls with centred pivots.");
+            Debug.Log("[KinoRotunda] Validated " + balls.Count + " independent, non-static balls with centred pivots.");
         }
 
         [System.Serializable]
@@ -50,6 +52,7 @@ namespace KinoRotunda.Editor
             foreach (var renderer in model.GetComponentsInChildren<MeshRenderer>(true))
             {
                 KinoLottery.ConfigureRenderer(renderer);
+                KinoPerimeterTubes.ConfigureRenderer(renderer);
                 if (!renderer.name.StartsWith("Ball_", System.StringComparison.Ordinal)) continue;
                 GameObjectUtility.SetStaticEditorFlags(renderer.gameObject, 0);
                 renderer.receiveGI = ReceiveGI.LightProbes;

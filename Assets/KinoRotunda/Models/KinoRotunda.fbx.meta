@@ -37,6 +37,11 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
+      name: TubeGlass
+    second: {fileID: 2100000, guid: 9cc0d5f8be3b23743910510efc5f0046, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
       name: WarmLED
     second: {fileID: 2100000, guid: b92610f7b78bf9e4fbfbcb2b181ae0dd, type: 2}
   materials:
