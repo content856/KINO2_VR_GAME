@@ -49,6 +49,7 @@ namespace KinoRotunda.Editor
             if (assetPath != "Assets/KinoRotunda/Models/KinoRotunda.fbx") return;
             foreach (var renderer in model.GetComponentsInChildren<MeshRenderer>(true))
             {
+                KinoLottery.ConfigureRenderer(renderer);
                 if (!renderer.name.StartsWith("Ball_", System.StringComparison.Ordinal)) continue;
                 GameObjectUtility.SetStaticEditorFlags(renderer.gameObject, 0);
                 renderer.receiveGI = ReceiveGI.LightProbes;

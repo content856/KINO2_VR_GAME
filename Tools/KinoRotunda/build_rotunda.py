@@ -348,6 +348,8 @@ from remove_rail_caps import remove_rail_caps
 remove_rail_caps()
 from separate_balls import separate_balls
 separate_balls()
+from refine_lottery import refine_lottery
+refine_lottery()
 objects = [o for o in scene.objects if o.type == 'MESH']
 bpy.ops.object.select_all(action='SELECT')
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(SOURCE,'KinoRotunda.blend'))

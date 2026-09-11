@@ -71,6 +71,9 @@ namespace KinoRotunda.Editor
                     case "stage-preview": KinoInteriorLighting.FinishStage(); break;
                     case "blue-marble": KinoMarbleFinish.Apply(); break;
                     case "marble-controls": KinoMarbleControls.SelectMaterial(); break;
+                    case "lottery-prepare": KinoLottery.Prepare(); Status("LOTTERY_PREPARED"); break;
+                    case "lottery-finish": KinoLottery.Apply(); Status("LOTTERY_READY"); break;
+                    case "lottery-preview": KinoLottery.CaptureViews("After"); Status("LOTTERY_PREVIEWED"); break;
                     default: throw new ArgumentException("Unknown KINO editor command: " + command);
                 }
             }
@@ -148,6 +151,7 @@ namespace KinoRotunda.Editor
                 var so = new SerializedObject(renderer);
                 so.FindProperty("m_ScaleInLightmap").floatValue = surface == "BrushedGold" || surface == "BronzeShadow" ? .24f : surface == "WarmLED" ? .30f : .7f;
                 so.ApplyModifiedPropertiesWithoutUndo();
+                KinoLottery.ConfigureRenderer(renderer);
             }
             MakeColliders(root.transform);
             var lightRoot = new GameObject("Lighting • baked warm interior").transform;
@@ -277,6 +281,7 @@ namespace KinoRotunda.Editor
             screen.SetTexture("_BaseMap",graphic);screen.SetTexture("_EmissionMap",graphic);
             screen.EnableKeyword("_EMISSION");screen.SetColor("_EmissionColor",Color.white*1.35f);
             screen.globalIlluminationFlags=MaterialGlobalIlluminationFlags.BakedEmissive;
+            materials.Add("LotteryGlass", KinoLottery.GlassMaterial());
             foreach(var m in materials.Values)EditorUtility.SetDirty(m);
             KinoReferenceLighting.ConfigureMaterials();
             AssetDatabase.SaveAssets();return materials;

@@ -68,6 +68,7 @@ namespace KinoRotunda.Editor
                 GameObjectUtility.SetStaticEditorFlags(r.gameObject, ball ? 0 :
                     StaticEditorFlags.BatchingStatic | StaticEditorFlags.ContributeGI |
                     StaticEditorFlags.OccludeeStatic | StaticEditorFlags.ReflectionProbeStatic);
+                KinoLottery.ConfigureRenderer(r);
             }
             if (Camera.main)
             {

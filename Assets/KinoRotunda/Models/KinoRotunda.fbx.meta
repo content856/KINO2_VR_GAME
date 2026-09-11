@@ -22,6 +22,11 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
+      name: LotteryGlass
+    second: {fileID: 2100000, guid: 27dfbdc76f2ed6645b2ef6dff61385a2, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
       name: NeroMarble
     second: {fileID: 2100000, guid: cbdd26e87749a004cade9b35853adab5, type: 2}
   - first:
