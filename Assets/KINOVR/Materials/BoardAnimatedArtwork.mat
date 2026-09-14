@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: BoardGold
+  m_Name: BoardAnimatedArtwork
   m_Shader: {fileID: 4800000, guid: 6313d66cfc7bde042af352f3a08db30e, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -31,7 +31,7 @@ Material:
     m_Floats:
     - _ColorMask: 15
     - _GlowStrength: 1
-    - _Mode: 1
+    - _Mode: 3
     - _MotionSpeed: 0.7
     - _PreviewTime: -1
     - _Stencil: 0

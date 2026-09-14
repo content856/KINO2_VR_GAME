@@ -16,7 +16,7 @@ namespace KinoVR.Editor
 {
     // Only explicit menu actions / request files alter assets or scenes.
     [InitializeOnLoad]
-    public static class KinoGameplaySetup
+    public static partial class KinoGameplaySetup
     {
         const string ScenePath = "Assets/KinoRotunda/Scenes/KinoRotunda.unity";
         const string OriginalGame = "Assets/KINOVR/Scenes/KINO_VR_Game.unity";
@@ -28,8 +28,9 @@ namespace KinoVR.Editor
         static int testPhase;
         static double testAt;
         static bool busy;
+        static GameObject testHand, testEdgeBall;
         static TMP_FontAsset font;
-        static Material panel, gold, badge;
+        static Material panel, gold;
 
         static KinoGameplaySetup()
         {
@@ -67,6 +68,9 @@ namespace KinoVR.Editor
                     case "setup": Setup(); break;
                     case "preview": Preview(); break;
                     case "pack": Pack(); break;
+                    case "visuals": UpgradeVisuals(); break;
+                    case "visual-preview": PreviewVisuals(); break;
+                    case "motion-preview": CaptureVisuals(true); break;
                     case "validate": Validate(); Status("VALIDATED"); break;
                     case "test": Validate(); SessionState.SetBool(TestKey, true); Status("PLAY_TEST_STARTING"); EditorApplication.isPlaying = true; break;
                     default: throw new ArgumentException("Unknown gameplay command: " + command);
@@ -78,6 +82,7 @@ namespace KinoVR.Editor
         static void Failure(Exception e)
         {
             SessionState.SetBool(TestKey, false);
+            if (testHand) Object.DestroyImmediate(testHand);
             File.WriteAllText(Output + "/error.txt", e.ToString());
             Status("ERROR " + e.Message);
             Debug.LogException(e);
@@ -190,7 +195,6 @@ namespace KinoVR.Editor
             if (!font) throw new InvalidOperationException("Missing TMP font.");
             panel = GraphicMaterial("BoardBlue", 0);
             gold = GraphicMaterial("BoardGold", 1);
-            badge = GraphicMaterial("BallNumberBadge", 2);
         }
 
         static void Pack()
@@ -236,26 +240,15 @@ namespace KinoVR.Editor
                 body.mass = .1f;
                 body.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
                 body.interpolation = RigidbodyInterpolation.Interpolate;
-                const string materialPath = "Assets/KINOVR/Materials/NumberedBallGold.mat";
-                var material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
-                if (!material)
-                {
-                    material = new Material(Shader.Find("Universal Render Pipeline/Lit")) { name = "NumberedBallGold" };
-                    material.SetColor("_BaseColor", new Color(1, .72f, .06f));
-                    material.SetFloat("_Metallic", .35f);
-                    material.SetFloat("_Smoothness", .65f);
-                    AssetDatabase.CreateAsset(material, materialPath);
-                }
-                contents.GetComponent<MeshRenderer>().sharedMaterial = material;
                 var visual = contents.AddComponent<KinoBallNumber>();
                 var face = new GameObject("Number facing player").transform;
                 face.SetParent(contents.transform, false);
                 visual.face = face;
                 var canvas = CanvasAt("Number badge", face, new Vector2(128, 128));
-                canvas.transform.localPosition = new Vector3(0, 0, -.505f);
+                canvas.transform.localPosition = new Vector3(0, 0, -.005f);
                 canvas.transform.localScale = Vector3.one * (.60f / 128);
-                Graphic("White badge", canvas.transform, 0, 0, 128, 128, badge);
-                visual.numberLabel = Text("Number", canvas.transform, 0, 0, 128, 128, "1", 76, new Color(.025f, .04f, .07f), true);
+                visual.numberLabel = Text("Number", canvas.transform, 0, 0, 128, 128, "1", 76, Color.black, true);
+                ConfigureOvalBall(contents);
                 return PrefabUtility.SaveAsPrefabAsset(contents, path);
             }
             finally { PrefabUtility.UnloadPrefabContents(contents); }
@@ -283,10 +276,10 @@ namespace KinoVR.Editor
             board.timeText = Text("Time remaining", canvas.transform, 789, 39, 201, 47, "01:15", 43, Color.white, true, TextAlignmentOptions.Right);
             var bar = Graphic("Time track", canvas.transform, 62, 97, 942, 10, null);
             bar.color = new Color(.005f, .035f, .10f);
-            var fill = Graphic("Time remaining fill", bar.transform, 0, 0, 942, 10, null);
+            var fill = Graphic("Time elapsed fill", bar.transform, 0, 0, 942, 10, null);
             fill.color = new Color(.03f, .68f, 1);
             fill.rectTransform.anchorMin = Vector2.zero;
-            fill.rectTransform.anchorMax = Vector2.one;
+            fill.rectTransform.anchorMax = Vector2.up;
             fill.rectTransform.offsetMin = fill.rectTransform.offsetMax = Vector2.zero;
             board.timeFill = fill.rectTransform;
             for (int number = 1; number <= 80; number++)
@@ -298,6 +291,7 @@ namespace KinoVR.Editor
                 board.numberLabels[number - 1] = Text("Number " + number, canvas.transform, x - 44, y - 26, 88, 52, number.ToString(), 33, board.waitingColor, false);
             }
             board.ResetBoard();
+            ConfigureBoardMotion(board);
             return board;
         }
         static Canvas CanvasAt(string name, Transform parent, Vector2 size)
@@ -464,16 +458,37 @@ namespace KinoVR.Editor
                         int number = caught.Number;
                         Assert(number >= 1 && number <= 80, "Spawned invalid number.");
                         Assert(ball.GetComponent<KinoBallNumber>().numberLabel.text == number.ToString(), "Ball number does not match label.");
+                        var labelScale = ball.GetComponent<KinoBallNumber>().numberLabel.transform.lossyScale;
+                        Assert(Mathf.Abs(labelScale.x - labelScale.y) < .0001f, "Ball number became stretched.");
                         caught.Catch();
                         caught.Catch();
                         Assert(round.board.caughtMarkers[number - 1].activeSelf, "Catch did not light board.");
                     }
                     Assert(round.State.CatchCount == 25 && round.score.CurrentScore == 25 && round.IsRunning, "Catch counted twice or stopped at 20.");
+                    // Send the oval's long end through a real hand trigger. This path
+                    // misses the old spherical collider, so it exercises the new shape.
+                    testHand = new GameObject("QA hand at oval edge");
+                    testHand.transform.position = new Vector3(.19f, 30, 0);
+                    testHand.AddComponent<SphereCollider>().radius = .025f;
+                    testHand.GetComponent<SphereCollider>().isTrigger = true;
+                    testHand.AddComponent<HandCatcher>();
+                    testEdgeBall = round.launcher.SpawnBall();
+                    var edgeBody = testEdgeBall.GetComponent<Rigidbody>();
+                    edgeBody.position = new Vector3(0, 30, -.35f);
+                    edgeBody.useGravity = false;
+                    edgeBody.linearVelocity = Vector3.forward * 2;
+                    testPhase = 1;
+                    testAt = EditorApplication.timeSinceStartup + .6;
+                }
+                else if (testPhase == 1)
+                {
+                    Assert(!testEdgeBall && round.State.CatchCount == 26, "The elongated end did not register a hand catch.");
+                    Object.DestroyImmediate(testHand);
                     round.BeginRound(.25f);
                     Assert(round.State.CatchCount == 0 && round.score.CurrentScore == 0, "Restart failed.");
                     Assert(round.board.caughtMarkers.All(m => !m.activeSelf), "Restart did not clear board.");
                     round.launcher.SpawnBall();
-                    testPhase = 1;
+                    testPhase = 2;
                     testAt = EditorApplication.timeSinceStartup + 1;
                 }
                 else
@@ -483,7 +498,7 @@ namespace KinoVR.Editor
                     Assert(!round.launcher.SpawnBall(), "Spawn accepted after timeout.");
                     Assert(Object.FindObjectsByType<Catchable>(FindObjectsSortMode.None).Length == 0, "Live balls remained after timeout.");
                     Assert(round.board.timeText.text == "00:00" && round.board.statusText.text == "ROUND COMPLETE", "Incorrect final board.");
-                    File.WriteAllText(Output + "/play-validation.txt", "PASS: numbered prefab labels; 25 catches; double-catch guard; board correspondence; +1 counter; restart clears board; timer stops launch and catches; live balls cleared; final UI.\n");
+                    File.WriteAllText(Output + "/play-validation.txt", "PASS: unstretched numbered labels; 25 catches; physical hand trigger catches the oval's long end; double-catch guard; board correspondence; +1 counter; restart clears board; timer stops launch and catches; live balls cleared; final UI.\n");
                     SessionState.SetBool(TestKey, false);
                     Status("PLAY_TEST_PASSED");
                     EditorApplication.isPlaying = false;

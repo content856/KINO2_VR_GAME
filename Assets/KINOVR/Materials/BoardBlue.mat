@@ -30,13 +30,17 @@ Material:
     m_Ints: []
     m_Floats:
     - _ColorMask: 15
+    - _GlowStrength: 1
     - _Mode: 0
+    - _MotionSpeed: 0.7
+    - _PreviewTime: -1
     - _Stencil: 0
     - _StencilComp: 8
     - _StencilOp: 0
     - _StencilReadMask: 255
     - _StencilWriteMask: 255
     m_Colors:
+    - _BoardRect: {r: 0.05539906, g: 0.06312292, b: 0.8967136, a: 0.7358804}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

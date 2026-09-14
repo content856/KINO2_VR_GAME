@@ -50,7 +50,7 @@ namespace KinoVR
             int total = Mathf.CeilToInt(Mathf.Max(0, seconds));
             if (timeText) timeText.text = $"{total / 60:00}:{total % 60:00}";
             if (statusText) statusText.text = finished ? "ROUND COMPLETE" : "BALLS CAUGHT";
-            if (timeFill) timeFill.anchorMax = new Vector2(Mathf.Clamp01(seconds / Mathf.Max(.01f, duration)), 1);
+            if (timeFill) timeFill.anchorMax = new Vector2(Mathf.Clamp01(1 - seconds / Mathf.Max(.01f, duration)), 1);
         }
     }
 }
