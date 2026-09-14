@@ -1,108 +1,89 @@
-using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
+using KinoVR;
+using UnityEngine;
 
-/// <summary>
-/// Spawns balls and launches them on a physics-based arc toward the player.
-/// The target point is randomized so balls don't land in exactly the same
-/// spot every time — they still read as "coming at you" without being a
-/// perfectly predictable straight shot.
-///
-/// Attach to an empty GameObject. Assign a player Transform, one or more
-/// spawn point Transforms, and a ball prefab that has a Rigidbody
-/// (or one will be added automatically) and a Collider.
-/// </summary>
 public class BallLauncher : MonoBehaviour
 {
     [Header("Target")]
-    [Tooltip("Usually the VR camera rig / head transform.")]
     public Transform player;
-
-    [Header("Spawn Points")]
     public Transform[] spawnPoints;
-
-    [Header("Ball")]
     public GameObject ballPrefab;
-
+    [Header("Round")]
+    public KinoRoundController round;
+    [Tooltip("Used only when this launcher is not controlled by a timed round.")]
+    public bool autoStart = true;
+    [Min(1)] public float ballLifetime = 6;
     [Header("Timing")]
-    public float minSpawnInterval = 0.5f;
-    public float maxSpawnInterval = 1.2f;
-
+    [Min(.05f)] public float minSpawnInterval = .5f;
+    [Min(.05f)] public float maxSpawnInterval = 1.2f;
     [Header("Flight")]
-    [Tooltip("Seconds for the ball to reach the target point. Lower = flatter/faster arc, higher = floatier arc.")]
-    public float flightTime = 1.1f;
-    [Tooltip("+/- percentage randomization applied to flightTime per ball, so not every ball moves at the same speed.")]
-    [Range(0f, 0.5f)]
-    public float speedVariance = 0.15f;
-
-    [Header("Imperfect Aim")]
-    [Tooltip("Max horizontal distance the target point can be offset from the player, in meters.")]
-    public float missRadius = 0.6f;
-    [Tooltip("Roughly where on the player the ball aims by default (1.2 = chest height if player.position is at floor level).")]
+    [Min(.1f)] public float flightTime = 1.1f;
+    [Range(0, .5f)] public float speedVariance = .15f;
+    [Min(0)] public float missRadius = .6f;
     public float aimHeightOffset = 1.2f;
 
-    private Coroutine spawnRoutine;
-
+    readonly List<GameObject> liveBalls = new List<GameObject>();
+    Coroutine spawnRoutine;
+    public bool IsLaunching => spawnRoutine != null;
     void OnEnable()
     {
-        spawnRoutine = StartCoroutine(SpawnLoop());
+        if (!round && autoStart) StartLaunching();
     }
-
-    void OnDisable()
+    void OnDisable() => StopLaunching(true);
+    public void StartLaunching()
+    {
+        if (spawnRoutine == null && isActiveAndEnabled) spawnRoutine = StartCoroutine(SpawnLoop());
+    }
+    public void StopLaunching(bool clearBalls)
     {
         if (spawnRoutine != null) StopCoroutine(spawnRoutine);
+        spawnRoutine = null;
+        if (!clearBalls) return;
+        foreach (var ball in liveBalls)
+        {
+            if (!ball) continue;
+            ball.SetActive(false);
+            Destroy(ball);
+        }
+        liveBalls.Clear();
     }
-
     IEnumerator SpawnLoop()
     {
-        while (true)
+        while (!round || round.IsRunning)
         {
-            yield return new WaitForSeconds(Random.Range(minSpawnInterval, maxSpawnInterval));
+            float low = Mathf.Max(.05f, minSpawnInterval);
+            yield return new WaitForSeconds(Random.Range(low, Mathf.Max(low, maxSpawnInterval)));
+            if (round && !round.IsRunning) break;
             SpawnBall();
         }
+        spawnRoutine = null;
     }
-
-    void SpawnBall()
+    public GameObject SpawnBall()
     {
-        if (spawnPoints.Length == 0 || ballPrefab == null || player == null) return;
-
-        Transform spawn = spawnPoints[Random.Range(0, spawnPoints.Length)];
-        GameObject ball = Instantiate(ballPrefab, spawn.position, Quaternion.identity);
-
-        Rigidbody rb = ball.GetComponent<Rigidbody>();
-        if (rb == null) rb = ball.AddComponent<Rigidbody>();
+        if (round) round.RefreshClock();
+        if (round && !round.IsRunning) return null;
+        if (spawnPoints == null || spawnPoints.Length == 0 || !ballPrefab || !player) return null;
+        var spawn = spawnPoints[Random.Range(0, spawnPoints.Length)];
+        if (!spawn) return null;
+        var ball = Instantiate(ballPrefab, spawn.position, Quaternion.identity);
+        liveBalls.RemoveAll(item => !item);
+        liveBalls.Add(ball);
+        int number = Random.Range(1, 81);
+        var catchable = ball.GetComponent<Catchable>();
+        if (catchable) catchable.Configure(number, round);
+        var visual = ball.GetComponent<KinoBallNumber>();
+        if (visual) visual.SetNumber(number, player);
+        var rb = ball.GetComponent<Rigidbody>();
+        if (!rb) rb = ball.AddComponent<Rigidbody>();
         rb.useGravity = true;
-
-        // Aim near the player, not exactly at them — a random horizontal
-        // offset within missRadius, biased slightly upward so balls
-        // don't skew toward the floor.
-        Vector2 flatOffset = Random.insideUnitCircle * missRadius;
-        Vector3 targetPos = player.position
-                             + new Vector3(flatOffset.x, 0f, flatOffset.y)
-                             + Vector3.up * aimHeightOffset;
-
-        float thisFlightTime = flightTime * Random.Range(1f - speedVariance, 1f + speedVariance);
-
-        rb.linearVelocity = LaunchVelocityForTime(spawn.position, targetPos, thisFlightTime);
-        // Unity < 6: use rb.velocity instead of rb.linearVelocity.
-    }
-
-    /// <summary>
-    /// Standard ballistic-trajectory solve: given a start point, an end point,
-    /// and a desired flight duration, returns the initial velocity a
-    /// gravity-affected Rigidbody needs to land exactly at that point at
-    /// exactly that time. After launch, physics (gravity, collisions,
-    /// air drag if you add it) takes over completely — nothing here
-    /// scripts the actual path frame to frame.
-    /// </summary>
-    Vector3 LaunchVelocityForTime(Vector3 origin, Vector3 target, float time)
-    {
-        float gravity = Mathf.Abs(Physics.gravity.y);
-        Vector3 delta = target - origin;
-        Vector3 deltaFlat = new Vector3(delta.x, 0f, delta.z);
-
-        Vector3 velocityFlat = deltaFlat / time;
-        float velocityY = (delta.y / time) + 0.5f * gravity * time;
-
-        return velocityFlat + Vector3.up * velocityY;
+        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+        rb.interpolation = RigidbodyInterpolation.Interpolate;
+        Vector2 offset = Random.insideUnitCircle * missRadius;
+        Vector3 target = player.position + new Vector3(offset.x, aimHeightOffset, offset.y);
+        float time = Mathf.Max(.1f, flightTime * Random.Range(1 - speedVariance, 1 + speedVariance));
+        rb.linearVelocity = (target - spawn.position) / time - .5f * Physics.gravity * time;
+        Destroy(ball, Mathf.Max(1, ballLifetime));
+        return ball;
     }
 }

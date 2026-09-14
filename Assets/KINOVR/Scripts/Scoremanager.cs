@@ -30,6 +30,12 @@ public class ScoreManager : MonoBehaviour
             return;
         }
         Instance = this;
+        ResetScore();
+    }
+
+    void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
     }
 
     public void AddScore(int amount, Catchable.BallType ballType)
@@ -38,7 +44,7 @@ public class ScoreManager : MonoBehaviour
         onScoreChanged?.Invoke(CurrentScore);
         onBallCaught?.Invoke(amount, ballType);
 
-        scoreText.text = CurrentScore.ToString();
+        if (scoreText) scoreText.text = CurrentScore.ToString();
     }
 
     public void ResetScore()
@@ -46,6 +52,6 @@ public class ScoreManager : MonoBehaviour
         CurrentScore = 0;
         onScoreChanged?.Invoke(CurrentScore);
 
-        scoreText.text = CurrentScore.ToString();
+        if (scoreText) scoreText.text = CurrentScore.ToString();
     }
 }

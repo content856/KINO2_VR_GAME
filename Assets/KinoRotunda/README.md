@@ -23,7 +23,7 @@ Blender stores geometry, UVs and six semantic surface slots only. It contains no
 - Column joints: the Blender repair pass seats the pilaster/round-column feet, capitals, balusters and display pilasters. Floor, ceiling, terrace slabs, topology, UV charts and Unity material mappings are preserved. The geometry generator includes this pass; `Artifacts/KinoRotunda/ColumnJoints` contains the original model backup, before/after close-ups and source/FBX contact validation.
 - Unity materials: NeroMarble, IvoryMarble, BrushedGold, BronzeShadow, WarmLED and Screen.
 - Arcade depth: the ivory arches and upper walls are recessed 0.80 m outward behind the black pilasters. Columns and capitals are 50% wider, centred beneath the arch spring footprint (including a 0.075 m tangential / 0.13 m outward alignment correction). The balustrade moves back 0.65 m, the exterior lip extends to radius 15.25 m, and a rear soffit closes the upper connection. `Tools/KinoRotunda/recess_arcade.py` applies these changes during regeneration. Backups and geometry previews are in `Artifacts/KinoRotunda/ArcadeDepth`.
-- Marble maps are original deterministic seamless textures. The KINO display graphic is a static decorative reference; it does not implement a live game or number draw.
+- Marble maps are original deterministic seamless textures. The original KINO display graphic remains on the architectural screen. The scene's `KINO Gameplay` prefab overlays a live number grid and timer; see `Assets/KINOVR/README.md` for the numbered-ball prototype.
 
 `Tools > KINO Rotunda > 9 - Blue marble polish` gives `NeroMarble` a deep blue tint and a subtle cool specular sheen using the standard URP Lit shader. It preserves the existing textures and smoothness, screen, lights, HDRI and reflection settings. The material backup and before/after previews are saved under `Artifacts/KinoRotunda/BlueMarble`; no lighting bake is triggered.
 
@@ -37,7 +37,7 @@ The scene preserves the exact inherited skybox material. Warm sconces, cove illu
 
 KINO-specific URP pipeline copies enable HDR and four-sample MSAA. The atmosphere profile supplies restrained bloom and ACES tone mapping. The original pipeline assets remain available, while quality levels point to the KINO copies.
 
-The architecture is static and has simplified floor, stage and perimeter collision. The saved camera is a composition preview; it is not an XR rig or a locomotion system. Headset performance and player interactions require validation in the intended runtime. Scene lightmaps are scene-specific: the environment prefab can be reused elsewhere, but lighting should be rebaked in the destination scene.
+The architecture is static and has simplified floor, stage and perimeter collision. The saved environment camera remains a composition preview. The separate `KINO Gameplay` prefab supplies the VR rig, hand catchers and a desktop gameplay camera. Headset performance and player interactions require validation in the intended runtime. Scene lightmaps are scene-specific: the environment prefab can be reused elsewhere, but lighting should be rebaked in the destination scene. Rebuilding the environment recreates the scene, so run `Tools > KINO VR > 1 - Set up numbered timed round` afterwards to add gameplay again.
 
 The column repair retains the existing baked lighting. Rebake lighting when updating the scene's illumination to account for the moved column surfaces.
 

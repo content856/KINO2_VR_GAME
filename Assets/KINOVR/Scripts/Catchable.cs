@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.Events;
+using KinoVR;
 
 /// <summary>
 /// Attach to the ball prefab. Defines the ball's type/value and what
@@ -10,6 +11,16 @@ using UnityEngine.Events;
 public class Catchable : MonoBehaviour
 {
     public enum BallType { Normal, MoreWins, Mystery, SecondChance }
+
+    public int Number { get; private set; } = 1;
+    KinoRoundController round;
+    bool roundControlled;
+    public void Configure(int number, KinoRoundController controller)
+    {
+        Number = Mathf.Clamp(number, 1, 80);
+        round = controller;
+        roundControlled = controller != null;
+    }
 
     [Header("Scoring")]
     public BallType ballType = BallType.Normal;
@@ -32,8 +43,14 @@ public class Catchable : MonoBehaviour
     {
         // Guards against both hands, or multiple colliders on one hand,
         // triggering the same ball twice in the same frame.
-        if (caught) return;
+        if (caught || !isActiveAndEnabled) return;
         caught = true;
+
+        if (roundControlled && (!round || !round.TryCatch(Number)))
+        {
+            Destroy(gameObject);
+            return;
+        }
 
         int awarded = pointValue;
         if (ballType == BallType.Mystery)
@@ -41,9 +58,13 @@ public class Catchable : MonoBehaviour
             awarded = Random.Range(mysteryMinBonus, mysteryMaxBonus + 1);
         }
 
-        ScoreManager.Instance.AddScore(awarded, ballType);
+        if (!roundControlled && ScoreManager.Instance) ScoreManager.Instance.AddScore(awarded, ballType);
 
-        if (catchVFX != null) Instantiate(catchVFX, transform.position, Quaternion.identity);
+        if (catchVFX != null)
+        {
+            var effect = Instantiate(catchVFX, transform.position, Quaternion.identity);
+            Destroy(effect, 5);
+        }
         if (catchSFX != null) AudioSource.PlayClipAtPoint(catchSFX, transform.position);
 
         onCaught?.Invoke(this);
