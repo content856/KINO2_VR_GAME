@@ -53,6 +53,14 @@ Unity previews now render through a floating-point HDR target before conversion 
 
 ## Verification output
 
+### Hall dust
+
+`Hall Dust - soft motes near the arches` is a native looping Particle System. Sparse, warm, translucent grains drift near the arcade at an emission radius of 9.5–11.25 m and heights of 1.5–5.25 m. The central player area and the approach to the display are clear of emitters. Prewarming populates the room on startup; each 30–38 second lifetime fades in and out, and low-frequency noise gently changes direction.
+
+One invisible mesh supplies emission points throughout that volume, and one billboard renderer shares the `HallDust` material. Emission is 3.2 particles/second with a hard cap of 128 particles (256 triangles). The one-pass URP shader computes the soft grain from UVs without a texture and depth-tests against the room. It fades near the camera and the hall boundaries. There are no particle lights, shadows, collisions, trails, depth texture copies or additional runtime scripts. The material supplies a restrained warm tint rather than sampling the scene lights. Headset GPU cost still needs measurement on Quest.
+
+Use the Particle System Inspector's **Emission**, **Start Size**, **Start Color** and **Noise** modules to tune the effect. `Tools > KINO Rotunda > Dust` sets up the preset, validates it and captures previews; setup reapplies the preset and saves a scene backup. After rebuilding the whole environment, run **Set up subtle hall dust** again. Scene comparisons, a motion clip when encoded, and validation reports are in `Artifacts/KinoRotunda/HallDust`.
+
 ### Exterior birds
 
 The scene's `Exterior Birds` object animates an occasional flock of 16 distant birds from the user-supplied `Textures/Birds/Birds.png`. Its **8 columns x 2 rows** play in reading order, for 16 frames at a nominal 32 FPS. **Stabilize Animation** defaults on: each full cell is registered to a fixed body/tail attachment point, removing the large vertical jump between sheet rows and at the loop boundary. Registration moves the quad relative to the body and mirrors its offset on right-side passes. The original PNG, wing poses, cell extent and bird scale stay intact; there is no added bob. The small registration table is calibrated to this source sheet, so a replacement sheet needs new landmarks. Validation independently measures the source alpha contour and checks the rendered landmark across all 16 frames in both directions.
