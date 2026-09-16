@@ -15,8 +15,18 @@ public class Catchable : MonoBehaviour
     public int Number { get; private set; } = 1;
     KinoRoundController round;
     bool roundControlled;
+    KinoPooledBall poolBall;
+    internal void SetPool(KinoPooledBall ball) => poolBall = ball;
+    internal void ResetForPool()
+    {
+        caught = true;
+        Number = 1;
+        round = null;
+        roundControlled = false;
+    }
     public void Configure(int number, KinoRoundController controller)
     {
+        caught = false;
         Number = Mathf.Clamp(number, 1, 80);
         round = controller;
         roundControlled = controller != null;
@@ -45,10 +55,11 @@ public class Catchable : MonoBehaviour
         // triggering the same ball twice in the same frame.
         if (caught || !isActiveAndEnabled) return;
         caught = true;
+        uint generation = poolBall ? poolBall.Generation : 0;
 
         if (roundControlled && (!round || !round.TryCatch(Number)))
         {
-            Destroy(gameObject);
+            Release(generation);
             return;
         }
 
@@ -69,6 +80,11 @@ public class Catchable : MonoBehaviour
 
         onCaught?.Invoke(this);
 
-        Destroy(gameObject);
+        Release(generation);
+    }
+    void Release(uint generation)
+    {
+        if (poolBall) poolBall.ReturnToPool(generation);
+        else Destroy(gameObject);
     }
 }

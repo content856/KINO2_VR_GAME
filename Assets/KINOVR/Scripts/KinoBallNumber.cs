@@ -12,12 +12,19 @@ namespace KinoVR
         [SerializeField, HideInInspector] int number = 1;
         public int Number => number;
         Transform viewer;
+        static readonly string[] NumberText = MakeNumberText();
+        static string[] MakeNumberText()
+        {
+            var text = new string[81];
+            for (int i = 0; i < text.Length; i++) text[i] = i.ToString();
+            return text;
+        }
         internal Transform Viewer => viewer;
         public void SetNumber(int value, Transform view)
         {
             number = value;
             viewer = view;
-            if (numberLabel) numberLabel.text = number.ToString();
+            if (numberLabel) numberLabel.text = NumberText[Mathf.Clamp(number, 0, 80)];
             RefreshFacing();
         }
         void LateUpdate() => RefreshFacing();

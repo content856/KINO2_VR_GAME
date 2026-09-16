@@ -26,7 +26,7 @@ namespace KinoVR
         [Min(0)] public float gameplayMixSpeed = 1.65f;
         [Min(.01f)] public float speedBlendSeconds = .8f;
 
-        public bool IdleMotionActive => kind == ChamberKind.Tube && !GameplayActive;
+        public bool IdleMotionActive => kind == ChamberKind.Tube && isActiveAndEnabled;
         public bool GameplayActive => round && round.isActiveAndEnabled && round.IsRunning;
         public float CurrentMixSpeed { get; private set; }
         Vector3[] positions, velocities;
@@ -77,9 +77,8 @@ namespace KinoVR
             if (positions == null || positions.Length != balls.Length) ResetMotion();
             var view = playerView && playerView.View ? playerView.View : viewer;
             if (view && view != viewer) FaceNumbers(view);
-            // Hand off immediately: no idle position/rotation writes during a round.
-            // Retain phase and velocity so countdown/intermission can resume smoothly.
-            if (kind == ChamberKind.Tube && gameplay) { accumulator = 0; return; }
+            // These are decorative chambers. Keep their air moving continuously;
+            // the separate launcher owns the gameplay balls in tubes 02 and 26.
             accumulator += Mathf.Clamp(deltaTime, 0, .1334f);
             while (accumulator >= Step)
             {

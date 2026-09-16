@@ -72,6 +72,12 @@ namespace KinoVR.Editor
                     case "visual-preview": PreviewVisuals(); break;
                     case "motion-preview": CaptureVisuals(true); break;
                     case "validate": Validate(); Status("VALIDATED"); break;
+                    case "air-validate": KinoAirChamberSetup.Validate(); Status("AIR_BALLS_VALIDATED"); break;
+                    case "tube-airflow": KinoTubeLaunchSetup.Apply(); Status("TUBE_AIRFLOW_READY"); break;
+                    case "tube-test": KinoTubeLaunchTests.Run(); break;
+                    case "tube-test-strong": KinoTubeLaunchTests.RunStrongTurbulence(); break;
+                    case "flight-tuning": KinoTubeLaunchSetup.ApplyFlightTuning(); Status("FLIGHT_TUNING_READY"); break;
+                    case "flight-controls": KinoTubeLaunchSetup.SelectDifficulty(); break;
                     case "test": Validate(); SessionState.SetBool(TestKey, true); Status("PLAY_TEST_STARTING"); EditorApplication.isPlaying = true; break;
                     default: throw new ArgumentException("Unknown gameplay command: " + command);
                 }
@@ -162,16 +168,10 @@ namespace KinoVR.Editor
             launcher.player = view.head;
             launcher.ballPrefab = prefab;
             launcher.aimHeightOffset = -.3f;
-            launcher.flightTime = 1.6f;
+            launcher.flightTime = 2.6f;
             launcher.missRadius = .4f;
-            launcher.spawnPoints = new Transform[3];
-            for (int i = 0; i < 3; i++)
-            {
-                var spawn = new GameObject("Launch point " + (i + 1)).transform;
-                spawn.SetParent(launcherGO.transform, false);
-                spawn.position = new Vector3((i - 1) * 2.2f, 1.2f, 7.5f);
-                launcher.spawnPoints[i] = spawn;
-            }
+            if (!GameObject.Find("KINO air balls")) new GameObject("KINO air balls");
+            KinoTubeLaunchSetup.ConfigureLauncher(launcher);
             round.launcher = launcher;
             round.board = MakeBoard(root.transform, Screen().bounds);
             round.board.SetProgress(0, round.roundDuration, round.roundDuration, false);
@@ -208,6 +208,11 @@ namespace KinoVR.Editor
             var view = root.GetComponent<KinoPlayerView>();
             view.environmentCamera = environmentCamera;
             PrefabUtility.RecordPrefabInstancePropertyModifications(view);
+            var launcher = root.GetComponentInChildren<BallLauncher>();
+            KinoTubeLaunchSetup.ConfigureLauncher(launcher);
+            KinoTubeLaunchSetup.ConfigurePrefabLauncher(launcher);
+            KinoTubeLaunchSetup.ConfigureLauncher(launcher);
+            PrefabUtility.RecordPrefabInstancePropertyModifications(launcher);
             EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
             EditorSceneManager.SaveScene(SceneManager.GetActiveScene());
             AssetDatabase.SaveAssets();
@@ -452,10 +457,14 @@ namespace KinoVR.Editor
                 {
                     round.BeginRound(10);
                     round.launcher.StopLaunching(false);
+                    Assert(round.launcher.PoolCount == 16, "Pool was not prewarmed.");
+                    GameObject previousBall = null;
                     for (int i = 0; i < 25; i++)
                     {
                         var ball = round.launcher.SpawnBall();
                         Assert(ball, "Manual spawn failed.");
+                        Assert(!previousBall || ball == previousBall, "Caught ball was not reused.");
+                        previousBall = ball;
                         var caught = ball.GetComponent<Catchable>();
                         int number = caught.Number;
                         Assert(number >= 1 && number <= 80, "Spawned invalid number.");
@@ -467,6 +476,7 @@ namespace KinoVR.Editor
                         Assert(round.board.caughtMarkers[number - 1].activeSelf, "Catch did not light board.");
                     }
                     Assert(round.State.CatchCount == 25 && round.score.CurrentScore == 25 && round.IsRunning, "Catch counted twice or stopped at 20.");
+                    Assert(round.launcher.PoolCount == 16 && round.launcher.ActiveBallCount == 0, "Catch leaked or expanded the pool.");
                     // Send the oval's long end through a real hand trigger. This path
                     // misses the old spherical collider, so it exercises the new shape.
                     testHand = new GameObject("QA hand at oval edge");
@@ -475,6 +485,7 @@ namespace KinoVR.Editor
                     testHand.GetComponent<SphereCollider>().isTrigger = true;
                     testHand.AddComponent<HandCatcher>();
                     testEdgeBall = round.launcher.SpawnBall();
+                    testEdgeBall.GetComponent<KinoPooledBall>().StopAirflow();
                     var edgeBody = testEdgeBall.GetComponent<Rigidbody>();
                     edgeBody.position = new Vector3(0, 30, -.35f);
                     edgeBody.useGravity = false;
@@ -484,7 +495,7 @@ namespace KinoVR.Editor
                 }
                 else if (testPhase == 1)
                 {
-                    Assert(!testEdgeBall && round.State.CatchCount == 26, "The elongated end did not register a hand catch.");
+                    Assert(testEdgeBall && !testEdgeBall.activeSelf && round.State.CatchCount == 26, "The elongated end did not register a hand catch and return to the pool.");
                     Object.DestroyImmediate(testHand);
                     round.BeginRound(.25f);
                     Assert(round.State.CatchCount == 0 && round.score.CurrentScore == 0, "Restart failed.");

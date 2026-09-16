@@ -100,6 +100,7 @@ namespace KinoVR.Editor
             var root = new GameObject(RootName);
             foreach (int bay in Bays)
             {
+                if (KinoTubeLaunchSetup.LaunchBays.Contains(bay)) continue;
                 var glass = Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None)
                     .Single(r => r.name == $"Tube_{bay:00}__TubeGlass");
                 var chamber = new GameObject($"Tube {bay:00} - idle air").AddComponent<KinoAirChamber>();
@@ -124,6 +125,7 @@ namespace KinoVR.Editor
                 AddBall(lottery, visualPrefab, i, new Vector3(Mathf.Cos(angle) * radius,
                     i < 8 ? .137f : .32f, Mathf.Sin(angle) * radius), .18f, Quaternion.identity);
             }
+            KinoTubeLaunchSetup.ConfigureAirRoot(root);
             KinoNumberBatchSetup.ConfigureChambers(root);
             PrefabUtility.SaveAsPrefabAssetAndConnect(root, AirPath, InteractionMode.AutomatedAction);
             var round = Object.FindFirstObjectByType<KinoRoundController>();
@@ -133,6 +135,8 @@ namespace KinoVR.Editor
                 chamber.round = round; chamber.playerView = round.playerView;
                 PrefabUtility.RecordPrefabInstancePropertyModifications(chamber);
             }
+            KinoTubeLaunchSetup.ConfigureLauncher(round.launcher);
+            PrefabUtility.RecordPrefabInstancePropertyModifications(round.launcher);
             // Retain imported source objects for model regeneration, but replace
             // their visible geometry in this scene with the numbered prefab variant.
             foreach (var renderer in OriginalBalls())
@@ -187,7 +191,7 @@ namespace KinoVR.Editor
             Directory.CreateDirectory(Output);
             KinoGameplaySetup.Validate();
             var chambers = GameObject.Find(RootName).GetComponentsInChildren<KinoAirChamber>();
-            Check(chambers.Length == 8 && chambers.Sum(c => c.balls.Length) == 77, "Expected 7 tubes, one lottery and 77 balls.");
+            Check(chambers.Length == 6 && chambers.Sum(c => c.balls.Length) == 59, "Expected 5 decorative tubes, one lottery and 59 balls; tubes 02/26 launch gameplay balls.");
             Check(OriginalBalls().Length == 77 && OriginalBalls().All(r => !r.enabled), "Old decorative balls remain visible.");
             var source = AssetDatabase.LoadAssetAtPath<GameObject>(BallPath);
             var gameplayMesh = source.GetComponent<MeshFilter>().sharedMesh;
@@ -223,6 +227,7 @@ namespace KinoVR.Editor
             {
                 var samples = copy.GetComponentsInChildren<KinoAirChamber>();
                 var starts = samples.Select(c => c.balls[4].transform.localPosition).ToArray();
+                var gameplayTravel = new float[samples.Length];
                 foreach (var c in samples) c.ResetMotion();
                 for (int frame = 0; frame < 3600; frame++)
                 {
@@ -234,8 +239,8 @@ namespace KinoVR.Editor
                         c.Advance(1f / 60, running);
                         if (c.kind == KinoAirChamber.ChamberKind.Tube)
                         {
-                            if (running) Check(c.balls[4].transform.localPosition == before, "Tube idle wrote a gameplay position.");
-                            else tubeTravel = Mathf.Max(tubeTravel, Mathf.Abs(c.balls[4].transform.localPosition.y - starts[n].y));
+                            if (running) gameplayTravel[n] += Vector3.Distance(c.balls[4].transform.localPosition, before);
+                            tubeTravel = Mathf.Max(tubeTravel, Mathf.Abs(c.balls[4].transform.localPosition.y - starts[n].y));
                         }
                         for (int i = 0; i < c.balls.Length; i++)
                         {
@@ -259,8 +264,11 @@ namespace KinoVR.Editor
                 }
                 Check(minGap > -.018f, "Ball overlap exceeds tolerance: " + minGap);
                 Check(tubeTravel > .8f, "Tube motion does not visibly rise/fall.");
+                for (int n = 0; n < samples.Length; n++)
+                    if (samples[n].kind == KinoAirChamber.ChamberKind.Tube)
+                        Check(gameplayTravel[n] > .8f, "Decorative tube stopped moving during gameplay: " + samples[n].name);
                 Check(UnityEngine.Random.state.Equals(randomBefore), "Decorations consumed gameplay randomness.");
-                File.WriteAllText(Output + "/validation.txt", $"PASS: 77 replacements; separate 576-triangle decorative mesh; 1,024-triangle gameplay mesh; matching bounds, pivot, number radii, material and font; uniform text; no catching/physics; 60s wall/floor/dome containment; contacts; tubes freeze in gameplay and resume; independent randomness.\nMinimum contact gap: {minGap:F5} m. Tube excursion: {tubeTravel:F3} m.\n");
+                File.WriteAllText(Output + "/validation.txt", $"PASS: 59 decorative replacements; two empty gameplay launch tubes; separate 576-triangle decorative mesh; 1,024-triangle gameplay mesh; matching bounds, pivot, number radii, material and font; uniform text; no catching/physics; 60s wall/floor/dome containment; contacts; all five decorative tubes keep moving through gameplay and intermission; independent randomness.\nMinimum contact gap: {minGap:F5} m. Tube excursion: {tubeTravel:F3} m.\n");
             }
             finally { Object.DestroyImmediate(copy); }
         }
@@ -362,19 +370,21 @@ namespace KinoVR.Editor
                 }
                 else if (phase == 2)
                 {
-                    Check(tubeBefore == tube.balls[4].transform.position && !tube.IdleMotionActive, "Tube did not hand off when gameplay began.");
+                    Check(round.IsRunning && tube.IdleMotionActive && Vector3.Distance(tubeBefore, tube.balls[4].transform.position) > .03f,
+                        "Decorative tube stopped moving during gameplay.");
                     Check(Mathf.Abs(lottery.CurrentMixSpeed - lottery.gameplayMixSpeed) < .01f, "Lottery did not speed up.");
                     Check(Object.FindObjectsByType<Catchable>(FindObjectsSortMode.None).Length == 0, "Decorations are catchable.");
                     foreach (var c in chambers) for (int i = 0; i < c.balls.Length; i++)
                         Check(c.balls[i].Number == c.numbers[i], "Runtime number mismatch.");
+                    tubeBefore = tube.balls[4].transform.position;
                     round.BeginRound(.15f); round.launcher.StopLaunching(true);
                 }
                 else
                 {
-                    Check(!round.IsRunning && tube.IdleMotionActive, "Deadline did not restore idle.");
-                    Check(tubeBefore != tube.balls[4].transform.position, "Tube did not resume after timeout.");
+                    Check(!round.IsRunning && tube.IdleMotionActive, "Tube idle stopped after deadline.");
+                    Check(tubeBefore != tube.balls[4].transform.position, "Tube stopped moving after timeout.");
                     Check(Mathf.Abs(lottery.CurrentMixSpeed - lottery.idleMixSpeed) < .01f, "Lottery did not slow down.");
-                    File.WriteAllText(Output + "/play-test.txt", "PASS: saved scene reloaded; idle air moves; BeginRound freezes tube motion; lottery speeds up; gameplay spawn and catch work; 77 decorative balls cannot be caught; matching runtime numbers; deadline restores idle motion and slow mixing.\n");
+                    File.WriteAllText(Output + "/play-test.txt", "PASS: saved scene reloaded; idle air moves; BeginRound keeps decorative tube motion running; lottery speeds up; gameplay spawn and catch work; 59 decorative balls cannot be caught; matching runtime numbers; deadline retains tube motion and restores slow lottery mixing.\n");
                     passed = true; EditorApplication.isPlaying = false; return;
                 }
                 phase++; nextCheck = EditorApplication.timeSinceStartup + 2;
