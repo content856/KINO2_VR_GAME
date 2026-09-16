@@ -33,6 +33,7 @@ namespace KinoVR
         Quaternion[] initialRotations;
         float airTime, accumulator;
         Transform viewer;
+        KinoNumberBatch numberBatch;
         const float Step = 1f / 60f;
 
         void OnEnable() => ResetMotion();
@@ -66,6 +67,8 @@ namespace KinoVR
             viewer = view;
             for (int i = 0; i < balls.Length; i++)
                 if (balls[i]) balls[i].SetNumber(i < numbers.Length ? numbers[i] : i + 1, view);
+            if (!numberBatch) numberBatch = GetComponentInChildren<KinoNumberBatch>();
+            if (numberBatch) numberBatch.Refresh();
         }
 
         /// <summary>Fixed simulation steps also make editor previews match runtime motion.</summary>

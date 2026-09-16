@@ -37,7 +37,7 @@ namespace KinoVR.Editor
             EditorApplication.update += Poll;
             EditorApplication.playModeStateChanged += change =>
             {
-                if (change == PlayModeStateChange.EnteredPlayMode) { testPhase = 0; testAt = EditorApplication.timeSinceStartup + 1; }
+                if (change == PlayModeStateChange.EnteredPlayMode) { testPhase = 0; testAt = Time.time + 1; }
             };
         }
         static void Status(string value)
@@ -441,7 +441,9 @@ namespace KinoVR.Editor
         }
         static void PlayTestTick()
         {
-            if (EditorApplication.timeSinceStartup < testAt) return;
+            // Physics and round deadlines advance in game time; Editor stalls
+            // (shader compilation, focus changes) must not exhaust a test phase.
+            if (Time.time < testAt) return;
             try
             {
                 var round = Object.FindFirstObjectByType<KinoRoundController>();
@@ -478,7 +480,7 @@ namespace KinoVR.Editor
                     edgeBody.useGravity = false;
                     edgeBody.linearVelocity = Vector3.forward * 2;
                     testPhase = 1;
-                    testAt = EditorApplication.timeSinceStartup + .6;
+                    testAt = Time.time + .6;
                 }
                 else if (testPhase == 1)
                 {
@@ -489,7 +491,7 @@ namespace KinoVR.Editor
                     Assert(round.board.caughtMarkers.All(m => !m.activeSelf), "Restart did not clear board.");
                     round.launcher.SpawnBall();
                     testPhase = 2;
-                    testAt = EditorApplication.timeSinceStartup + 1;
+                    testAt = Time.time + 1;
                 }
                 else
                 {

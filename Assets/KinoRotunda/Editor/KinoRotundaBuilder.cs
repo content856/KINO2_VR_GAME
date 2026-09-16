@@ -216,6 +216,7 @@ namespace KinoRotunda.Editor
             Lightmapping.lightingSettings = AssetDatabase.LoadAssetAtPath<LightingSettings>(Root + "/Settings/KinoLighting.asset");
             LightmapSettings.lightmapsMode = LightmapsMode.NonDirectional;
             KinoReferenceLighting.Configure();
+            KinoOrnamentBatchSetup.Configure(root);
             PrefabUtility.SaveAsPrefabAsset(root, Root + "/Prefabs/KinoRotunda.prefab");
             EditorSceneManager.SaveScene(scene, ScenePath);
             var builds = EditorBuildSettings.scenes.Where(s => s.path != ScenePath).ToList();

@@ -9,15 +9,19 @@ namespace KinoVR
         public Transform face;
         [Tooltip("Baked oval mesh radii; the root and label keep uniform scale.")]
         public Vector3 surfaceRadii = new Vector3(.63f, .375f, .375f);
+        [SerializeField, HideInInspector] int number = 1;
+        public int Number => number;
         Transform viewer;
-        public void SetNumber(int number, Transform view)
+        internal Transform Viewer => viewer;
+        public void SetNumber(int value, Transform view)
         {
+            number = value;
             viewer = view;
             if (numberLabel) numberLabel.text = number.ToString();
-            FaceViewer();
+            RefreshFacing();
         }
-        void LateUpdate() => FaceViewer();
-        void FaceViewer()
+        void LateUpdate() => RefreshFacing();
+        public void RefreshFacing()
         {
             if (!viewer || !face) return;
             Vector3 away = transform.position - viewer.position;

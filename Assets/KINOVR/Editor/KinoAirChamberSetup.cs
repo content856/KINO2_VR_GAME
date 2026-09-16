@@ -78,6 +78,7 @@ namespace KinoVR.Editor
                 EditorSceneManager.SaveScene(scene, Output + "/Before.unity", true);
             var source = AssetDatabase.LoadAssetAtPath<GameObject>(BallPath);
             Check(source, "Gameplay ball is missing.");
+            KinoNumberBatchSetup.GenerateGeometry();
             // Inherit gameplay lacquer/text, with a lighter mesh of the same shape.
             // Removing physics/catching prevents decorative numbers awarding points.
             var visual = (GameObject)PrefabUtility.InstantiatePrefab(source);
@@ -89,6 +90,7 @@ namespace KinoVR.Editor
                 foreach (var catcher in visual.GetComponentsInChildren<Catchable>(true)) Object.DestroyImmediate(catcher);
                 visual.tag = "Untagged";
                 visual.GetComponent<MeshFilter>().sharedMesh = KinoGameplaySetup.DecorativeOvalMesh();
+                KinoNumberBatchSetup.ConfigureDecoration(visual);
                 PrefabUtility.SaveAsPrefabAsset(visual, VisualPath);
             }
             finally { Object.DestroyImmediate(visual); }
@@ -122,6 +124,7 @@ namespace KinoVR.Editor
                 AddBall(lottery, visualPrefab, i, new Vector3(Mathf.Cos(angle) * radius,
                     i < 8 ? .137f : .32f, Mathf.Sin(angle) * radius), .18f, Quaternion.identity);
             }
+            KinoNumberBatchSetup.ConfigureChambers(root);
             PrefabUtility.SaveAsPrefabAssetAndConnect(root, AirPath, InteractionMode.AutomatedAction);
             var round = Object.FindFirstObjectByType<KinoRoundController>();
             Check(round, "Round controller is missing.");
@@ -170,7 +173,7 @@ namespace KinoVR.Editor
             var label = ball.GetComponent<KinoBallNumber>();
             label.SetNumber(number, null);
             PrefabUtility.RecordPrefabInstancePropertyModifications(ball.transform);
-            PrefabUtility.RecordPrefabInstancePropertyModifications(label.numberLabel);
+            PrefabUtility.RecordPrefabInstancePropertyModifications(label);
             chamber.balls[index] = label; chamber.numbers[index] = number;
         }
 
@@ -194,14 +197,21 @@ namespace KinoVR.Editor
             Check(gameplayMesh.vertexCount == 561 && gameplayMesh.subMeshCount == 1 && gameplayMesh.GetIndexCount(0) == 3072, "Expected a 1,024-triangle gameplay mesh.");
             Check(Vector3.Distance(decorativeMesh.bounds.size, gameplayMesh.bounds.size) < .00001f &&
                 decorativeMesh.bounds.center.sqrMagnitude < .00000001f, "Decorative shape or pivot differs from gameplay.");
+            var numberGeometry = AssetDatabase.LoadAssetAtPath<KinoNumberGeometry>(KinoNumberBatchSetup.GeometryPath);
+            Check(numberGeometry && numberGeometry.numbers.Length == 80 && numberGeometry.material &&
+                numberGeometry.material.mainTexture == source.GetComponent<KinoBallNumber>().numberLabel.fontSharedMaterial.mainTexture,
+                "Number batch must use the existing font atlas.");
+            Check(chambers.All(c => c.GetComponentInChildren<KinoNumberBatch>() &&
+                c.GetComponentInChildren<KinoNumberBatch>().geometry == numberGeometry), "Missing chamber number batch.");
             foreach (var chamber in chambers)
             foreach (var ball in chamber.balls)
             {
                 Check(ball.GetComponent<MeshFilter>().sharedMesh == decorativeMesh, "Decorative mesh override is missing.");
                 Check(ball.surfaceRadii == source.GetComponent<KinoBallNumber>().surfaceRadii, "Number surface placement differs from gameplay.");
                 Check(ball.GetComponent<MeshRenderer>().sharedMaterial == source.GetComponent<MeshRenderer>().sharedMaterial, "Lacquer differs from gameplay.");
-                Check(ball.numberLabel.font == source.GetComponent<KinoBallNumber>().numberLabel.font && ball.numberLabel.color == Color.black, "Incorrect number styling.");
-                var scale = ball.numberLabel.transform.lossyScale;
+                Check(!ball.numberLabel && !ball.enabled && ball.GetComponentsInChildren<Canvas>(true).Length == 0, "Decorative number still uses individual UI updates.");
+                Check(ball.Number >= 1 && ball.Number <= 80, "Invalid decorative number.");
+                var scale = ball.face.lossyScale;
                 Check(Mathf.Abs(scale.x - scale.y) < .00001f, "Number is stretched.");
                 Check(!ball.GetComponent<Catchable>() && !ball.GetComponent<Collider>() && !ball.GetComponent<Rigidbody>(), "Decorative ball participates in gameplay physics.");
             }
@@ -356,7 +366,7 @@ namespace KinoVR.Editor
                     Check(Mathf.Abs(lottery.CurrentMixSpeed - lottery.gameplayMixSpeed) < .01f, "Lottery did not speed up.");
                     Check(Object.FindObjectsByType<Catchable>(FindObjectsSortMode.None).Length == 0, "Decorations are catchable.");
                     foreach (var c in chambers) for (int i = 0; i < c.balls.Length; i++)
-                        Check(c.balls[i].numberLabel.text == c.numbers[i].ToString(), "Runtime number mismatch.");
+                        Check(c.balls[i].Number == c.numbers[i], "Runtime number mismatch.");
                     round.BeginRound(.15f); round.launcher.StopLaunching(true);
                 }
                 else

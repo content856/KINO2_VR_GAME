@@ -55,6 +55,12 @@ Unity previews now render through a floating-point HDR target before conversion 
 
 ## Verification output
 
+### Fixed ornament groups
+
+**Tools > KINO Rotunda > 13 - Group fixed ornaments** combines the 278 fixed gold ornaments into 82 local renderers. Arcade bases and left/right capitals remain separate; the wider stage is split into small spatial cells. The 20,824 triangles, UV channels and shared gold material are retained. Each group uses a nearby source transform as its probe anchor, while retaining local culling bounds. Tube and lottery balls are excluded.
+
+Original transforms and mesh renderers remain under the imported model for editing. Disabling a group's `KinoOrnamentBatch` restores its individual source renderers, so they can be animated again. Reapplying the command regenerates the meshes from those transforms; the environment builder also creates the groups. Source meshes and the scene's baked lightmaps are preserved.
+
 ### Hall dust
 
 `Hall Dust - soft motes near the arches` is a native looping Particle System. Sparse, warm, translucent grains drift near the arcade at an emission radius of 9.5–11.25 m and heights of 1.5–5.25 m. The central player area and the approach to the display are clear of emitters. Prewarming populates the room on startup; each 30–38 second lifetime fades in and out, and low-frequency noise gently changes direction.
