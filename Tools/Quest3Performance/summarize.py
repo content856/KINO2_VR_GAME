@@ -11,7 +11,7 @@ import statistics
 out = Path('Artifacts/Quest3Performance')
 inventory = json.loads((out / 'scene-inventory.json').read_text(encoding='utf-8'))
 active = [r for r in inventory['renderers'] if r['active'] and r['enabled']]
-decorative = [r for r in active if r['meshAsset'].endswith('KinoOvalBall.asset')]
+decorative = [r for r in active if r['meshAsset'].endswith(('KinoOvalBall.asset', 'KinoDecorativeOvalBall.asset'))]
 ornaments = [r for r in active if '/Animation_Balls/' in r['path']]
 total_triangles = sum(r['triangles'] for r in active)
 scene = {

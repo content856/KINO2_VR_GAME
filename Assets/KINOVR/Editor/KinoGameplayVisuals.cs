@@ -16,17 +16,21 @@ namespace KinoVR.Editor
     public static partial class KinoGameplaySetup
     {
         const string VisualOutput = Output + "/VisualRefresh";
+        internal const string DecorativeOvalMeshPath = "Assets/KINOVR/Meshes/KinoDecorativeOvalBall.asset";
         static readonly Vector3 OvalSize = new Vector3(1.26f, .75f, .75f);
 
-        static void ConfigureOvalBall(GameObject ball)
+        internal static Mesh GameplayOvalMesh() => LoadOvalMesh("Assets/KINOVR/Meshes/KinoOvalBall.asset", 32, 16, "KINO oval 1.68 to 1");
+        internal static Mesh DecorativeOvalMesh() => LoadOvalMesh(DecorativeOvalMeshPath, 24, 12, "KINO decorative oval 1.68 to 1");
+
+        static Mesh LoadOvalMesh(string meshPath, int columns, int rows, string meshName)
         {
-            const string meshPath = "Assets/KINOVR/Meshes/KinoOvalBall.asset";
             if (!AssetDatabase.IsValidFolder("Assets/KINOVR/Meshes"))
                 AssetDatabase.CreateFolder("Assets/KINOVR", "Meshes");
             var mesh = AssetDatabase.LoadAssetAtPath<Mesh>(meshPath);
-            if (!mesh || mesh.vertexCount < 2000)
+            if (!mesh || mesh.vertexCount != (columns + 1) * (rows + 1) ||
+                mesh.subMeshCount != 1 || mesh.GetIndexCount(0) != columns * rows * 6)
             {
-                var generated = MakeOvalMesh();
+                var generated = MakeOvalMesh(columns, rows, meshName);
                 if (mesh)
                 {
                     EditorUtility.CopySerialized(generated, mesh);
@@ -39,6 +43,12 @@ namespace KinoVR.Editor
                     AssetDatabase.CreateAsset(mesh, meshPath);
                 }
             }
+            return mesh;
+        }
+
+        static void ConfigureOvalBall(GameObject ball)
+        {
+            var mesh = GameplayOvalMesh();
             ball.GetComponent<MeshFilter>().sharedMesh = mesh;
             // Bake the shape into the vertices so the number never inherits a squash.
             ball.transform.localScale = Vector3.one * .3f;
@@ -83,9 +93,8 @@ namespace KinoVR.Editor
             visual.numberLabel.transform.localScale = Vector3.one;
         }
 
-        static Mesh MakeOvalMesh()
+        static Mesh MakeOvalMesh(int columns, int rows, string meshName)
         {
-            const int columns = 64, rows = 32;
             var vertices = new Vector3[(columns + 1) * (rows + 1)];
             var normals = new Vector3[vertices.Length];
             var uv = new Vector2[vertices.Length];
@@ -106,7 +115,7 @@ namespace KinoVR.Editor
                 triangles[t] = index; triangles[t + 1] = index + 1; triangles[t + 2] = next;
                 triangles[t + 3] = index + 1; triangles[t + 4] = next + 1; triangles[t + 5] = next;
             }
-            var mesh = new Mesh { name = "KINO oval 1.68 to 1", vertices = vertices, normals = normals, uv = uv, triangles = triangles };
+            var mesh = new Mesh { name = meshName, vertices = vertices, normals = normals, uv = uv, triangles = triangles };
             mesh.RecalculateBounds();
             mesh.RecalculateTangents();
             return mesh;
@@ -189,7 +198,9 @@ namespace KinoVR.Editor
         {
             var round = Object.FindFirstObjectByType<KinoRoundController>();
             var ball = round.launcher.ballPrefab;
-            var shape = ball.GetComponent<MeshFilter>().sharedMesh.bounds.size;
+            var mesh = ball.GetComponent<MeshFilter>().sharedMesh;
+            Assert(mesh.vertexCount == 561 && mesh.subMeshCount == 1 && mesh.GetIndexCount(0) == 3072, "Gameplay ball must use the 1,024-triangle mesh.");
+            var shape = mesh.bounds.size;
             Assert(Mathf.Abs(shape.x / shape.y - 1.68f) < .01f, "Ball must match the board's oval ratio.");
             Assert(ball.transform.localScale == Vector3.one * .3f, "Ball root must stay uniformly scaled.");
             var collider = ball.GetComponent<CapsuleCollider>();

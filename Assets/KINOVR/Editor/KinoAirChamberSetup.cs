@@ -78,7 +78,7 @@ namespace KinoVR.Editor
                 EditorSceneManager.SaveScene(scene, Output + "/Before.unity", true);
             var source = AssetDatabase.LoadAssetAtPath<GameObject>(BallPath);
             Check(source, "Gameplay ball is missing.");
-            // A prefab variant inherits the exact gameplay mesh, lacquer, and text.
+            // Inherit gameplay lacquer/text, with a lighter mesh of the same shape.
             // Removing physics/catching prevents decorative numbers awarding points.
             var visual = (GameObject)PrefabUtility.InstantiatePrefab(source);
             try
@@ -88,6 +88,7 @@ namespace KinoVR.Editor
                 foreach (var body in visual.GetComponentsInChildren<Rigidbody>(true)) Object.DestroyImmediate(body);
                 foreach (var catcher in visual.GetComponentsInChildren<Catchable>(true)) Object.DestroyImmediate(catcher);
                 visual.tag = "Untagged";
+                visual.GetComponent<MeshFilter>().sharedMesh = KinoGameplaySetup.DecorativeOvalMesh();
                 PrefabUtility.SaveAsPrefabAsset(visual, VisualPath);
             }
             finally { Object.DestroyImmediate(visual); }
@@ -141,6 +142,23 @@ namespace KinoVR.Editor
             EditorSceneManager.SaveScene(scene);
         }
 
+        [MenuItem("Tools/KINO VR/Air balls/4 - Apply ball mesh budgets")]
+        public static void ApplyBallMeshBudgets()
+        {
+            Check(!EditorApplication.isPlayingOrWillChangePlaymode, "Exit Play mode first.");
+            // Update the existing gameplay asset in place so prefab references and
+            // physics stay intact. Decorations use a separate, fixed mesh; no LOD.
+            KinoGameplaySetup.GameplayOvalMesh();
+            var visual = PrefabUtility.LoadPrefabContents(VisualPath);
+            try
+            {
+                visual.GetComponent<MeshFilter>().sharedMesh = KinoGameplaySetup.DecorativeOvalMesh();
+                PrefabUtility.SaveAsPrefabAsset(visual, VisualPath);
+                AssetDatabase.SaveAssets();
+            }
+            finally { PrefabUtility.UnloadPrefabContents(visual); }
+        }
+
         static void AddBall(KinoAirChamber chamber, GameObject prefab, int index, Vector3 position, float scale, Quaternion rotation)
         {
             var ball = (GameObject)PrefabUtility.InstantiatePrefab(prefab, chamber.transform);
@@ -169,10 +187,18 @@ namespace KinoVR.Editor
             Check(chambers.Length == 8 && chambers.Sum(c => c.balls.Length) == 77, "Expected 7 tubes, one lottery and 77 balls.");
             Check(OriginalBalls().Length == 77 && OriginalBalls().All(r => !r.enabled), "Old decorative balls remain visible.");
             var source = AssetDatabase.LoadAssetAtPath<GameObject>(BallPath);
+            var gameplayMesh = source.GetComponent<MeshFilter>().sharedMesh;
+            var decorativeMesh = AssetDatabase.LoadAssetAtPath<Mesh>(KinoGameplaySetup.DecorativeOvalMeshPath);
+            Check(decorativeMesh && decorativeMesh != gameplayMesh && decorativeMesh.vertexCount == 325 &&
+                decorativeMesh.subMeshCount == 1 && decorativeMesh.GetIndexCount(0) == 1728, "Expected a separate 576-triangle decorative mesh.");
+            Check(gameplayMesh.vertexCount == 561 && gameplayMesh.subMeshCount == 1 && gameplayMesh.GetIndexCount(0) == 3072, "Expected a 1,024-triangle gameplay mesh.");
+            Check(Vector3.Distance(decorativeMesh.bounds.size, gameplayMesh.bounds.size) < .00001f &&
+                decorativeMesh.bounds.center.sqrMagnitude < .00000001f, "Decorative shape or pivot differs from gameplay.");
             foreach (var chamber in chambers)
             foreach (var ball in chamber.balls)
             {
-                Check(ball.GetComponent<MeshFilter>().sharedMesh == source.GetComponent<MeshFilter>().sharedMesh, "Mesh differs from gameplay.");
+                Check(ball.GetComponent<MeshFilter>().sharedMesh == decorativeMesh, "Decorative mesh override is missing.");
+                Check(ball.surfaceRadii == source.GetComponent<KinoBallNumber>().surfaceRadii, "Number surface placement differs from gameplay.");
                 Check(ball.GetComponent<MeshRenderer>().sharedMaterial == source.GetComponent<MeshRenderer>().sharedMaterial, "Lacquer differs from gameplay.");
                 Check(ball.numberLabel.font == source.GetComponent<KinoBallNumber>().numberLabel.font && ball.numberLabel.color == Color.black, "Incorrect number styling.");
                 var scale = ball.numberLabel.transform.lossyScale;
@@ -224,7 +250,7 @@ namespace KinoVR.Editor
                 Check(minGap > -.018f, "Ball overlap exceeds tolerance: " + minGap);
                 Check(tubeTravel > .8f, "Tube motion does not visibly rise/fall.");
                 Check(UnityEngine.Random.state.Equals(randomBefore), "Decorations consumed gameplay randomness.");
-                File.WriteAllText(Output + "/validation.txt", $"PASS: 77 replacements; exact gameplay mesh/material/font; uniform text; no catching/physics; 60s wall/floor/dome containment; contacts; tubes freeze in gameplay and resume; independent randomness.\nMinimum contact gap: {minGap:F5} m. Tube excursion: {tubeTravel:F3} m.\n");
+                File.WriteAllText(Output + "/validation.txt", $"PASS: 77 replacements; separate 576-triangle decorative mesh; 1,024-triangle gameplay mesh; matching bounds, pivot, number radii, material and font; uniform text; no catching/physics; 60s wall/floor/dome containment; contacts; tubes freeze in gameplay and resume; independent randomness.\nMinimum contact gap: {minGap:F5} m. Tube excursion: {tubeTravel:F3} m.\n");
             }
             finally { Object.DestroyImmediate(copy); }
         }
