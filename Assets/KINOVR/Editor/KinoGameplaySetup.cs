@@ -81,6 +81,10 @@ namespace KinoVR.Editor
                     case "boost": ApplyBoost(); Status("BOOST_READY"); break;
                     case "boost-preview": CaptureBoost(); break;
                     case "boost-test": KinoBoostTests.Run(); break;
+                    case "kino-bonus": ApplyKinoBonus(); break;
+                    case "kino-bonus-test": KinoBonusTests.Run(); break;
+                    case "kino-bonus-preview": CaptureKinoBonus(); break;
+                    case "kino-bonus-board-preview": CaptureKinoBonusBoard(); break;
                     case "test": Validate(); SessionState.SetBool(TestKey, true); Status("PLAY_TEST_STARTING"); EditorApplication.isPlaying = true; break;
                     default: throw new ArgumentException("Unknown gameplay command: " + command);
                 }
@@ -301,6 +305,7 @@ namespace KinoVR.Editor
             }
             board.ResetBoard();
             ConfigureBoardMotion(board);
+            ConfigureKinoBonusBoard(board);
             return board;
         }
         static Canvas CanvasAt(string name, Transform parent, Vector2 size)
@@ -472,6 +477,7 @@ namespace KinoVR.Editor
                         previousBall = ball;
                         var caught = ball.GetComponent<Catchable>();
                         int number = caught.Number;
+                        caught.Configure(number, round); // This regression verifies ordinary-ball scoring.
                         Assert(number >= 1 && number <= 80, "Spawned invalid number.");
                         Assert(ball.GetComponent<KinoBallNumber>().numberLabel.text == number.ToString(), "Ball number does not match label.");
                         var labelScale = ball.GetComponent<KinoBallNumber>().numberLabel.transform.lossyScale;

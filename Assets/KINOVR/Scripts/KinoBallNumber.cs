@@ -7,11 +7,29 @@ namespace KinoVR
     {
         public TMP_Text numberLabel;
         public Transform face;
+        public Material kinoBonusMaterial;
         [Tooltip("Baked oval mesh radii; the root and label keep uniform scale.")]
         public Vector3 surfaceRadii = new Vector3(.63f, .375f, .375f);
         [SerializeField, HideInInspector] int number = 1;
         public int Number => number;
         Transform viewer;
+        MeshRenderer ballRenderer;
+        Material normalMaterial;
+        Color normalNumberColor;
+        bool appearanceCached;
+
+        public void SetBonus(bool isBonus)
+        {
+            if (!appearanceCached)
+            {
+                ballRenderer = GetComponent<MeshRenderer>();
+                normalMaterial = ballRenderer ? ballRenderer.sharedMaterial : null;
+                normalNumberColor = numberLabel ? numberLabel.color : Color.black;
+                appearanceCached = true;
+            }
+            if (ballRenderer) ballRenderer.sharedMaterial = isBonus && kinoBonusMaterial ? kinoBonusMaterial : normalMaterial;
+            if (numberLabel) numberLabel.color = isBonus ? Color.white : normalNumberColor;
+        }
         static readonly string[] NumberText = MakeNumberText();
         static string[] MakeNumberText()
         {

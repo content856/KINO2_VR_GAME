@@ -41,6 +41,10 @@ public class BallLauncher : MonoBehaviour
     double nextSpawn;
     int nextTube;
     bool initialized;
+    bool bonusScheduled;
+    public bool HasLaunchedKinoBonus { get; private set; }
+    public double KinoBonusSpawnTime { get; private set; }
+    bool BonusIsDue => bonusScheduled && !HasLaunchedKinoBonus && Time.timeAsDouble >= KinoBonusSpawnTime;
     public bool IsLaunching { get; private set; }
     public int PoolCount => pool.Count;
     public int ActiveBallCount { get; private set; }
@@ -49,6 +53,15 @@ public class BallLauncher : MonoBehaviour
     public float TubeTimeMultiplier { get; private set; } = 1;
     public float EffectiveFlightTime => flightTime * FlightTimeMultiplier;
     public float EffectiveTubeRiseTime => tubeRiseTime * TubeTimeMultiplier;
+
+    public void PrepareRoundBonus(float duration)
+    {
+        HasLaunchedKinoBonus = false;
+        bonusScheduled = true;
+        // Leave time for a full pool to free a slot and for the bonus to reach the hands.
+        float latest = Mathf.Max(0, duration - 2 * Mathf.Max(1, ballLifetime));
+        KinoBonusSpawnTime = Time.timeAsDouble + Random.Range(0, latest);
+    }
 
     public void SetPace(float interval, float flight, float tube)
     {
@@ -63,7 +76,7 @@ public class BallLauncher : MonoBehaviour
     void OnDisable() => StopLaunching(true);
     void Update()
     {
-        if (!IsLaunching || Time.timeAsDouble < nextSpawn) return;
+        if (!IsLaunching || (Time.timeAsDouble < nextSpawn && !BonusIsDue)) return;
         if (round && !round.IsRunning) { StopLaunching(true); return; }
         SpawnBall();
         ScheduleNext();
@@ -120,7 +133,10 @@ public class BallLauncher : MonoBehaviour
         var ball = available.Pop();
         var exit = exitPoints != null && index < exitPoints.Length ? exitPoints[index] : null;
         ActiveBallCount++;
-        ball.Activate(spawn, exit, Random.Range(1, 81));
+        // Consume the round's one bonus only after a pool slot and spawn are available.
+        bool isKinoBonus = BonusIsDue;
+        if (isKinoBonus) HasLaunchedKinoBonus = true;
+        ball.Activate(spawn, exit, Random.Range(1, 81), isKinoBonus);
         return ball.gameObject;
     }
     internal void Recycle(KinoPooledBall ball)

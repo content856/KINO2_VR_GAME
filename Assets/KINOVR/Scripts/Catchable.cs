@@ -10,7 +10,9 @@ using KinoVR;
 /// </summary>
 public class Catchable : MonoBehaviour
 {
-    public enum BallType { Normal, MoreWins, Mystery, SecondChance }
+    public enum BallType { Normal, MoreWins, Mystery, SecondChance, KinoBonus }
+
+    public bool IsKinoBonus => ballType == BallType.KinoBonus;
 
     public int Number { get; private set; } = 1;
     KinoRoundController round;
@@ -23,13 +25,15 @@ public class Catchable : MonoBehaviour
         Number = 1;
         round = null;
         roundControlled = false;
+        ballType = BallType.Normal;
     }
-    public void Configure(int number, KinoRoundController controller)
+    public void Configure(int number, KinoRoundController controller, bool isKinoBonus = false)
     {
         caught = false;
         Number = Mathf.Clamp(number, 1, 80);
         round = controller;
         roundControlled = controller != null;
+        ballType = isKinoBonus ? BallType.KinoBonus : BallType.Normal;
     }
 
     [Header("Scoring")]
@@ -42,6 +46,7 @@ public class Catchable : MonoBehaviour
 
     [Header("Feedback")]
     public GameObject catchVFX;
+    public GameObject kinoBonusCatchVFX;
     public AudioClip catchSFX;
 
     [Tooltip("Extra hook for anything else that should react to this specific ball being caught.")]
@@ -57,13 +62,13 @@ public class Catchable : MonoBehaviour
         caught = true;
         uint generation = poolBall ? poolBall.Generation : 0;
 
-        if (roundControlled && (!round || !round.TryCatch(Number)))
+        if (roundControlled && (!round || !round.TryCatch(Number, ballType)))
         {
             Release(generation);
             return;
         }
 
-        int awarded = pointValue;
+        int awarded = pointValue * (IsKinoBonus ? KinoRoundState.BonusMultiplier : 1);
         if (ballType == BallType.Mystery)
         {
             awarded = Random.Range(mysteryMinBonus, mysteryMaxBonus + 1);
@@ -71,9 +76,10 @@ public class Catchable : MonoBehaviour
 
         if (!roundControlled && ScoreManager.Instance) ScoreManager.Instance.AddScore(awarded, ballType);
 
-        if (catchVFX != null)
+        var feedback = IsKinoBonus && kinoBonusCatchVFX ? kinoBonusCatchVFX : catchVFX;
+        if (feedback != null)
         {
-            var effect = Instantiate(catchVFX, transform.position, Quaternion.identity);
+            var effect = Instantiate(feedback, transform.position, Quaternion.identity);
             Destroy(effect, 5);
         }
         if (catchSFX != null) AudioSource.PlayClipAtPoint(catchSFX, transform.position);

@@ -36,7 +36,7 @@ namespace KinoVR
             gameObject.SetActive(false);
         }
 
-        internal void Activate(Transform spawn, Transform outlet, int number)
+        internal void Activate(Transform spawn, Transform outlet, int number, bool isKinoBonus)
         {
             Generation++;
             leased = airflow = true;
@@ -58,8 +58,12 @@ namespace KinoVR
             body.detectCollisions = !rising;
             body.interpolation = RigidbodyInterpolation.Interpolate;
             body.collisionDetectionMode = rising ? CollisionDetectionMode.ContinuousSpeculative : CollisionDetectionMode.ContinuousDynamic;
-            catchable.Configure(number, owner.round);
-            if (visual) visual.SetNumber(number, owner.player);
+            catchable.Configure(number, owner.round, isKinoBonus);
+            if (visual)
+            {
+                visual.SetBonus(isKinoBonus);
+                visual.SetNumber(number, owner.player);
+            }
             gameObject.SetActive(true);
             if (!rising) BeginFlight();
         }
@@ -175,7 +179,11 @@ namespace KinoVR
             body.isKinematic = true;
             body.rotation = initialRotation;
             catchable.ResetForPool();
-            if (visual) visual.SetNumber(1, null);
+            if (visual)
+            {
+                visual.SetBonus(false);
+                visual.SetNumber(1, null);
+            }
         }
         void OnDisable() { if (leased) ReturnToPool(Generation); }
     }

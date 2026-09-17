@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace KinoVR
 {
@@ -14,7 +15,12 @@ namespace KinoVR
         public RectTransform timeFill;
         public Color waitingColor = new Color(.10f, .85f, 1f);
         public Color caughtColor = new Color(.025f, .045f, .08f);
+        public Material kinoBonusMarkerMaterial;
+        public Color bonusCaughtColor = Color.white;
         readonly float[] pulseUntil = new float[80];
+        readonly bool[] bonusCaught = new bool[80];
+        readonly Graphic[] markerGraphics = new Graphic[80];
+        readonly Material[] normalMarkerMaterials = new Material[80];
         bool boosted;
         public void SetBoostColors(bool active)
         {
@@ -35,21 +41,37 @@ namespace KinoVR
         {
             for (int i = 0; i < 80; i++)
             {
+                bonusCaught[i] = false;
                 if (i < numberLabels.Length && numberLabels[i]) numberLabels[i].color = boosted ? new Color(1, .72f, .18f) : waitingColor;
                 if (i < caughtMarkers.Length && caughtMarkers[i])
                 {
                     caughtMarkers[i].SetActive(false);
                     caughtMarkers[i].transform.localScale = Vector3.one;
+                    CacheMarker(i);
+                    if (markerGraphics[i]) markerGraphics[i].material = normalMarkerMaterials[i];
                 }
                 pulseUntil[i] = 0;
             }
         }
-        public void MarkCaught(int number)
+        void CacheMarker(int i)
+        {
+            if (markerGraphics[i] || i >= caughtMarkers.Length || !caughtMarkers[i]) return;
+            markerGraphics[i] = caughtMarkers[i].GetComponent<Graphic>();
+            if (markerGraphics[i]) normalMarkerMaterials[i] = markerGraphics[i].material;
+        }
+        public void MarkCaught(int number, bool isKinoBonus = false)
         {
             if (number < 1 || number > 80) return;
             int i = number - 1;
-            if (i < numberLabels.Length && numberLabels[i]) numberLabels[i].color = caughtColor;
-            if (i < caughtMarkers.Length && caughtMarkers[i]) caughtMarkers[i].SetActive(true);
+            // Once this number earns a bonus, ordinary repeats cannot downgrade it.
+            bonusCaught[i] |= isKinoBonus;
+            if (i < numberLabels.Length && numberLabels[i]) numberLabels[i].color = bonusCaught[i] ? bonusCaughtColor : caughtColor;
+            if (i < caughtMarkers.Length && caughtMarkers[i])
+            {
+                CacheMarker(i);
+                if (markerGraphics[i]) markerGraphics[i].material = bonusCaught[i] && kinoBonusMarkerMaterial ? kinoBonusMarkerMaterial : normalMarkerMaterials[i];
+                caughtMarkers[i].SetActive(true);
+            }
             pulseUntil[i] = Time.time + .35f;
         }
         void Update()

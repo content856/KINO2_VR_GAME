@@ -41789,6 +41789,8 @@ MonoBehaviour:
   timeFill: {fileID: 1066975352780175996}
   waitingColor: {r: 0.1, g: 0.85, b: 1, a: 1}
   caughtColor: {r: 0.025, g: 0.045, b: 0.08, a: 1}
+  kinoBonusMarkerMaterial: {fileID: 2100000, guid: 727062d0f2879e949932940d51fd7462, type: 2}
+  bonusCaughtColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!1 &8883812085115369193
 GameObject:
   m_ObjectHideFlags: 0

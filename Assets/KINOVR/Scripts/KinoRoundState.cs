@@ -7,6 +7,7 @@ namespace KinoVR
     // Scene-independent catch and deadline rules.
     public sealed class KinoRoundState
     {
+        public const int BonusMultiplier = 3;
         readonly HashSet<int> numbers = new HashSet<int>();
         double mainDeadline, calmDeadline, deadline;
         float mainDuration, calmDuration, boostDuration;
@@ -46,12 +47,12 @@ namespace KinoVR
             double phaseEnd = Phase == KinoRoundPhase.Main ? mainDeadline : Phase == KinoRoundPhase.Calm ? calmDeadline : deadline;
             RemainingSeconds = (float)Math.Max(0, phaseEnd - now);
         }
-        public bool TryCatch(int number, double now)
+        public bool TryCatch(int number, double now, bool isKinoBonus = false)
         {
             Tick(now);
             if (!IsRunning || number < 1 || number > 80) return false;
             CatchCount++;
-            Score += Multiplier;
+            Score += Multiplier * (isKinoBonus ? BonusMultiplier : 1);
             numbers.Add(number);
             return true;
         }

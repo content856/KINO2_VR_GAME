@@ -43,6 +43,7 @@ namespace KinoVR
                 launcher.round = this;
                 if (playerView && playerView.View) launcher.player = playerView.View;
                 launcher.SetPace(1, 1, 1);
+                launcher.PrepareRoundBonus(duration + (enableBoostRound ? calmDuration + boostDuration : 0));
                 launcher.StartLaunching();
             }
             PresentPhase();
@@ -57,16 +58,17 @@ namespace KinoVR
             else PresentPhase();
             RefreshBoard();
         }
-        public bool TryCatch(int number)
+        public bool TryCatch(int number, Catchable.BallType ballType = Catchable.BallType.Normal)
         {
             RefreshClock();
-            if (!State.TryCatch(number, Time.timeAsDouble))
+            int previousScore = State.Score;
+            if (!State.TryCatch(number, Time.timeAsDouble, ballType == Catchable.BallType.KinoBonus))
             {
                 if (!State.IsRunning && !finishPresented) FinishRound();
                 return false;
             }
-            if (score) score.AddScore(State.Multiplier, Catchable.BallType.Normal);
-            if (board) board.MarkCaught(number);
+            if (score) score.AddScore(State.Score - previousScore, ballType);
+            if (board) board.MarkCaught(number, ballType == Catchable.BallType.KinoBonus);
             RefreshBoard();
             return true;
         }

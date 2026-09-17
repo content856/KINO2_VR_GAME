@@ -78,6 +78,7 @@ namespace KinoVR.Editor
             Check(ball, "Could not lease ball.");
             var catchable = ball.GetComponent<Catchable>();
             int number = catchable.Number;
+            catchable.Configure(number, round); // Isolate ordinary-ball phase scoring from the one scheduled bonus.
             catchable.Catch(); catchable.Catch();
             Check(round.State.Score == expectedScore && round.score.CurrentScore == expectedScore && round.State.CatchCount == expectedCount,
                 "Score/catch count/double trigger failure.");
