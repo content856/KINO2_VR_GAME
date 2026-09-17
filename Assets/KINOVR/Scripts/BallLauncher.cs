@@ -15,7 +15,7 @@ public class BallLauncher : MonoBehaviour
     [Min(1)] public float ballLifetime = 6;
     [Header("Pool")]
     [Min(1)] public int poolCapacity = 16;
-    [Header("Timing")]
+    [Header("Standalone timing (rounds use 20 evenly spaced launches)")]
     [Min(.05f)] public float minSpawnInterval = .5f;
     [Min(.05f)] public float maxSpawnInterval = 1.2f;
     [Header("Tube ascent")]
@@ -41,10 +41,7 @@ public class BallLauncher : MonoBehaviour
     double nextSpawn;
     int nextTube;
     bool initialized;
-    bool bonusScheduled;
-    public bool HasLaunchedKinoBonus { get; private set; }
-    public double KinoBonusSpawnTime { get; private set; }
-    bool BonusIsDue => bonusScheduled && !HasLaunchedKinoBonus && Time.timeAsDouble >= KinoBonusSpawnTime;
+    public bool HasLaunchedKinoBonus => round && round.State.BonusLaunched;
     public bool IsLaunching { get; private set; }
     public int PoolCount => pool.Count;
     public int ActiveBallCount { get; private set; }
@@ -53,15 +50,6 @@ public class BallLauncher : MonoBehaviour
     public float TubeTimeMultiplier { get; private set; } = 1;
     public float EffectiveFlightTime => flightTime * FlightTimeMultiplier;
     public float EffectiveTubeRiseTime => tubeRiseTime * TubeTimeMultiplier;
-
-    public void PrepareRoundBonus(float duration)
-    {
-        HasLaunchedKinoBonus = false;
-        bonusScheduled = true;
-        // Leave time for a full pool to free a slot and for the bonus to reach the hands.
-        float latest = Mathf.Max(0, duration - 2 * Mathf.Max(1, ballLifetime));
-        KinoBonusSpawnTime = Time.timeAsDouble + Random.Range(0, latest);
-    }
 
     public void SetPace(float interval, float flight, float tube)
     {
@@ -76,7 +64,13 @@ public class BallLauncher : MonoBehaviour
     void OnDisable() => StopLaunching(true);
     void Update()
     {
-        if (!IsLaunching || (Time.timeAsDouble < nextSpawn && !BonusIsDue)) return;
+        if (!IsLaunching) return;
+        if (round)
+        {
+            SpawnBall(); // The round's absolute 20-slot schedule controls eligibility.
+            return;
+        }
+        if (Time.timeAsDouble < nextSpawn) return;
         if (round && !round.IsRunning) { StopLaunching(true); return; }
         SpawnBall();
         ScheduleNext();
@@ -123,6 +117,8 @@ public class BallLauncher : MonoBehaviour
     {
         if (round) round.RefreshClock();
         if (round && !round.IsRunning) return null;
+        bool isKinoBonus = round && round.State.Phase == KinoRoundPhase.Bonus;
+        if (round && (isKinoBonus ? round.State.BonusLaunched || round.State.UniqueCount == 0 : !round.State.IsNormalLaunchDue(Time.timeAsDouble))) return null;
         if (!isActiveAndEnabled || spawnPoints == null || spawnPoints.Length == 0 || !ballPrefab || !player) return null;
         int index = spawnIndex < 0 ? nextTube++ % spawnPoints.Length : spawnIndex % spawnPoints.Length;
         var spawn = spawnPoints[index];
@@ -130,13 +126,12 @@ public class BallLauncher : MonoBehaviour
         Prewarm();
         // A full pool skips this spawn; never steal a live ball or instantiate mid-round.
         if (available.Count == 0) return null;
+        if (round && !(isKinoBonus ? round.State.TryRegisterBonusLaunch() : round.State.TryRegisterNormalLaunch(Time.timeAsDouble))) return null;
         var ball = available.Pop();
         var exit = exitPoints != null && index < exitPoints.Length ? exitPoints[index] : null;
         ActiveBallCount++;
-        // Consume the round's one bonus only after a pool slot and spawn are available.
-        bool isKinoBonus = BonusIsDue;
-        if (isKinoBonus) HasLaunchedKinoBonus = true;
-        ball.Activate(spawn, exit, Random.Range(1, 81), isKinoBonus);
+        int number = isKinoBonus ? round.State.GetCaughtNumber(Random.Range(0, round.State.UniqueCount)) : Random.Range(1, 81);
+        ball.Activate(spawn, exit, number, isKinoBonus);
         return ball.gameObject;
     }
     internal void Recycle(KinoPooledBall ball)

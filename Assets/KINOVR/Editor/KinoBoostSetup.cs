@@ -112,7 +112,6 @@ namespace KinoVR.Editor
             }
             presentation = round.gameObject.AddComponent<KinoBoostPresentation>();
             round.boostPresentation = presentation;
-            round.enableBoostRound = true;
             presentation.board = board;
             var root = FullBoardGroup("BOOST display", board.transform);
             var brand = FullBoardGroup("Sharp KINO brand", root);
@@ -240,10 +239,12 @@ namespace KinoVR.Editor
                 CaptureBoostCamera(camera, "Room-normal");
                 CaptureQuestSettings(camera, round, "Quest-settings-normal");
                 var previewState = new KinoRoundState();
-                previewState.Begin(75, 0, 6, 25);
+                previewState.Begin(60, 0);
                 foreach (int n in new[] { 4, 11, 16, 24, 35, 41, 56, 62, 67, 72, 75, 80 })
                 {
-                    previewState.TryCatch(n, 10);
+                    double at = previewState.NextNormalLaunchAt;
+                    previewState.TryRegisterNormalLaunch(at);
+                    previewState.TryCatch(n, at);
                     round.board.MarkCaught(n);
                 }
                 previewState.Tick(81);

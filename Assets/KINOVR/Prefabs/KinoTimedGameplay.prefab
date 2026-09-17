@@ -5659,14 +5659,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2e6012df11018a84e9b559db00b0ba73, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KinoVR.KinoRoundController
-  roundDuration: 75
+  roundDuration: 60
   startAutomatically: 1
-  enableBoostRound: 1
-  calmDuration: 6
-  boostDuration: 25
-  calmSpawnMultiplier: 2.4
-  boostSpawnMultiplier: 0.48
-  boostFlightMultiplier: 0.7
+  bonusNumberInterval: 1
   boostPresentation: {fileID: 8601947099273915403}
   launcher: {fileID: 8543960737314665690}
   board: {fileID: 8535792389271218388}
@@ -12839,7 +12834,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 01:15
+  m_text: 01:00
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -36742,7 +36737,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: CAUGHT 000
+  m_text: CAUGHT 00 / 20
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}

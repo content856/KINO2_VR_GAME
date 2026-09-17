@@ -34,8 +34,9 @@ namespace KinoVR
         {
             SetProgress(state.Score, state.RemainingSeconds, state.PhaseDuration, finished);
             if (statusText && !finished)
-                statusText.text = state.Phase == KinoRoundPhase.Boost ? "SCORE  <color=#FFC43D>x3</color>" : "SCORE";
-            if (caughtTotalText) caughtTotalText.text = $"CAUGHT {state.CatchCount:000}";
+                statusText.text = state.Phase == KinoRoundPhase.Bonus ? "KINO BONUS <color=#FF394F>x3</color>" :
+                    state.Phase == KinoRoundPhase.Settling ? "LAST BALLS" : "SCORE";
+            if (caughtTotalText) caughtTotalText.text = $"CAUGHT {state.NormalCatchCount:00} / {KinoRoundState.NormalBallLimit}";
         }
         public void ResetBoard()
         {

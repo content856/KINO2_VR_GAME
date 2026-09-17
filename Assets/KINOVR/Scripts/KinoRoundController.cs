@@ -5,15 +5,13 @@ namespace KinoVR
 {
     public sealed class KinoRoundController : MonoBehaviour
     {
-        [Min(1)] public float roundDuration = 75;
+        [Min(1)] public float roundDuration = 60;
         public bool startAutomatically = true;
-        [Header("KINO BOOST bonus round")]
-        public bool enableBoostRound = true;
-        [Min(0)] public float calmDuration = 6;
-        [Min(1)] public float boostDuration = 25;
-        [Range(1, 4)] public float calmSpawnMultiplier = 2.4f;
-        [Range(.2f, 1)] public float boostSpawnMultiplier = .48f;
-        [Range(.4f, 1)] public float boostFlightMultiplier = .7f;
+        [Header("Final KINO Bonus")]
+        [Tooltip("Seconds each previously caught number stays visible on the final bonus ball.")]
+        [Min(.25f)] public float bonusNumberInterval = 1;
+        // Retain the room/brand presentation reference, without its old timed phase.
+        [HideInInspector]
         public KinoBoostPresentation boostPresentation;
         public BallLauncher launcher;
         public KinoNumberBoard board;
@@ -23,7 +21,7 @@ namespace KinoVR
         public KinoRoundState State { get; } = new KinoRoundState();
         public bool IsRunning => State.IsRunning;
         bool finishPresented;
-        KinoRoundPhase presentedPhase = KinoRoundPhase.Idle;
+        bool refreshing;
         void Start()
         {
             if (startAutomatically) BeginRound();
@@ -32,8 +30,7 @@ namespace KinoVR
         public void BeginRound(float duration)
         {
             if (launcher) launcher.StopLaunching(true);
-            State.Begin(duration, Time.timeAsDouble, enableBoostRound ? calmDuration : 0, enableBoostRound ? boostDuration : 0);
-            presentedPhase = KinoRoundPhase.Idle;
+            State.Begin(duration, Time.timeAsDouble);
             finishPresented = false;
             if (boostPresentation) boostPresentation.SetBoost(false);
             if (score) score.ResetScore();
@@ -43,20 +40,27 @@ namespace KinoVR
                 launcher.round = this;
                 if (playerView && playerView.View) launcher.player = playerView.View;
                 launcher.SetPace(1, 1, 1);
-                launcher.PrepareRoundBonus(duration + (enableBoostRound ? calmDuration + boostDuration : 0));
                 launcher.StartLaunching();
             }
-            PresentPhase();
             RefreshBoard();
         }
         void Update() => RefreshClock();
         public void RefreshClock()
         {
-            if (finishPresented || !State.IsRunning) return;
-            State.Tick(Time.timeAsDouble);
-            if (!State.IsRunning) FinishRound();
-            else PresentPhase();
-            RefreshBoard();
+            if (refreshing || finishPresented || !State.IsRunning) return;
+            refreshing = true;
+            try
+            {
+                State.Tick(Time.timeAsDouble);
+                // Keep the last ordinary flight catchable after 00:00. Freeze the
+                // bonus candidate set only after every ordinary ball is resolved.
+                if (State.Phase == KinoRoundPhase.Settling && State.ResolvedNormalCount == KinoRoundState.NormalBallLimit &&
+                    (!launcher || launcher.ActiveBallCount == 0)) State.TryBeginBonus();
+                if (!State.IsRunning || (State.Phase == KinoRoundPhase.Bonus && State.BonusLaunched &&
+                    (!launcher || launcher.ActiveBallCount == 0))) FinishRound();
+                RefreshBoard();
+            }
+            finally { refreshing = false; }
         }
         public bool TryCatch(int number, Catchable.BallType ballType = Catchable.BallType.Normal)
         {
@@ -72,6 +76,11 @@ namespace KinoVR
             RefreshBoard();
             return true;
         }
+        public void MissBall(bool isKinoBonus)
+        {
+            State.Tick(Time.timeAsDouble);
+            State.TryMiss(isKinoBonus);
+        }
         public void FinishRound()
         {
             if (finishPresented) return;
@@ -86,19 +95,6 @@ namespace KinoVR
         void RefreshBoard()
         {
             if (board) board.SetRoundProgress(State, finishPresented);
-        }
-        void PresentPhase()
-        {
-            if (presentedPhase == State.Phase) return;
-            presentedPhase = State.Phase;
-            bool boosted = State.Phase == KinoRoundPhase.Boost;
-            if (launcher)
-            {
-                if (boosted) launcher.SetPace(boostSpawnMultiplier, boostFlightMultiplier, boostFlightMultiplier);
-                else if (State.Phase == KinoRoundPhase.Calm) launcher.SetPace(calmSpawnMultiplier, 1.15f, 1.15f);
-                else launcher.SetPace(1, 1, 1);
-            }
-            if (boostPresentation) boostPresentation.SetBoost(boosted);
         }
         void OnDisable()
         {

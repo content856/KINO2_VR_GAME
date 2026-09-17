@@ -22,23 +22,15 @@ namespace KinoVR.Editor
         const string OriginalGame = "Assets/KINOVR/Scenes/KINO_VR_Game.unity";
         const string Output = "Artifacts/KinoGameplay";
         const string Request = "Temp/KinoGameplay.request";
-        const string TestKey = "KinoGameplay.PlayTest";
         const string RootName = "KINO Gameplay";
         static double nextPoll;
-        static int testPhase;
-        static double testAt;
         static bool busy;
-        static GameObject testHand, testEdgeBall;
         static TMP_FontAsset font;
         static Material panel, gold;
 
         static KinoGameplaySetup()
         {
             EditorApplication.update += Poll;
-            EditorApplication.playModeStateChanged += change =>
-            {
-                if (change == PlayModeStateChange.EnteredPlayMode) { testPhase = 0; testAt = Time.time + 1; }
-            };
         }
         static void Status(string value)
         {
@@ -49,11 +41,7 @@ namespace KinoVR.Editor
         static void Poll()
         {
             if (EditorApplication.isCompiling || EditorApplication.isUpdating || busy) return;
-            if (EditorApplication.isPlaying)
-            {
-                if (SessionState.GetBool(TestKey, false)) PlayTestTick();
-                return;
-            }
+            if (EditorApplication.isPlaying) return;
             if (EditorApplication.isPlayingOrWillChangePlaymode || EditorApplication.timeSinceStartup < nextPoll) return;
             nextPoll = EditorApplication.timeSinceStartup + .5;
             if (!File.Exists(Request)) return;
@@ -85,7 +73,7 @@ namespace KinoVR.Editor
                     case "kino-bonus-test": KinoBonusTests.Run(); break;
                     case "kino-bonus-preview": CaptureKinoBonus(); break;
                     case "kino-bonus-board-preview": CaptureKinoBonusBoard(); break;
-                    case "test": Validate(); SessionState.SetBool(TestKey, true); Status("PLAY_TEST_STARTING"); EditorApplication.isPlaying = true; break;
+                    case "test": Validate(); KinoBonusTests.Run(); break;
                     default: throw new ArgumentException("Unknown gameplay command: " + command);
                 }
             }
@@ -94,8 +82,6 @@ namespace KinoVR.Editor
         }
         static void Failure(Exception e)
         {
-            SessionState.SetBool(TestKey, false);
-            if (testHand) Object.DestroyImmediate(testHand);
             File.WriteAllText(Output + "/error.txt", e.ToString());
             Status("ERROR " + e.Message);
             Debug.LogException(e);
@@ -286,7 +272,7 @@ namespace KinoVR.Editor
             board.statusText = Text("Round status", canvas.transform, 65, 17, 278, 24, "BALLS CAUGHT", 17, new Color(.45f, .82f, 1), true, TextAlignmentOptions.Left);
             board.catchCountText = Text("Catch count", canvas.transform, 65, 39, 278, 47, "000", 43, Color.white, true, TextAlignmentOptions.Left);
             Text("Time caption", canvas.transform, 789, 17, 201, 24, "TIME", 17, new Color(.45f, .82f, 1), true, TextAlignmentOptions.Right);
-            board.timeText = Text("Time remaining", canvas.transform, 789, 39, 201, 47, "01:15", 43, Color.white, true, TextAlignmentOptions.Right);
+            board.timeText = Text("Time remaining", canvas.transform, 789, 39, 201, 47, "01:00", 43, Color.white, true, TextAlignmentOptions.Right);
             var bar = Graphic("Time track", canvas.transform, 62, 97, 942, 10, null);
             bar.color = new Color(.005f, .035f, .10f);
             var fill = Graphic("Time elapsed fill", bar.transform, 0, 0, 942, 10, null);
@@ -368,20 +354,8 @@ namespace KinoVR.Editor
             Assert(round.playerView.head && round.playerView.desktopCamera, "Missing player view.");
             var prefab = round.launcher.ballPrefab;
             Assert(prefab && prefab.GetComponent<Catchable>() && prefab.GetComponent<KinoBallNumber>() && prefab.CompareTag("Ball"), "Invalid numbered ball prefab.");
-            var state = new KinoRoundState();
-            Assert(!state.TryCatch(1, 0), "Catch accepted before start.");
-            state.Begin(75, 100);
-            Assert(!state.TryCatch(0, 101) && !state.TryCatch(81, 101), "Invalid number accepted.");
-            for (int n = 1; n <= 80; n++) Assert(state.TryCatch(n, 101), "Catch unexpectedly limited at " + n);
-            Assert(state.CatchCount == 80 && state.UniqueCount == 80 && state.IsRunning, "Unexpected catch cap.");
-            Assert(state.TryCatch(1, 102) && state.CatchCount == 81 && state.UniqueCount == 80, "Repeat handling incorrect.");
-            Assert(state.TryCatch(80, 174.99), "Catch before deadline rejected.");
-            Assert(!state.TryCatch(1, 175) && state.RemainingSeconds == 0, "Catch at deadline accepted.");
-            state.Begin(10, 200);
-            Assert(state.CatchCount == 0 && state.UniqueCount == 0 && !state.HasCaught(80), "Round reset failed.");
-            state.Stop();
-            Assert(!state.TryCatch(1, 201), "Catch after stop accepted.");
-            File.WriteAllText(Output + "/validation.txt", "PASS: 80 numbered positions; two hand catchers; numbered prefab; invalid numbers; no 20-ball cap; repeat catches; exact deadline; round reset; stop.\n");
+            KinoBonusTests.ValidateRules();
+            File.WriteAllText(Output + "/validation.txt", "PASS: board references, 20-ball draw, final bonus rules and catch memory.\n");
         }
 
         [MenuItem("Tools/KINO VR/3 - Capture board and ball previews")]
@@ -452,83 +426,6 @@ namespace KinoVR.Editor
                 RenderTexture.ReleaseTemporary(rt);
                 Object.DestroyImmediate(pixels);
             }
-        }
-        static void PlayTestTick()
-        {
-            // Physics and round deadlines advance in game time; Editor stalls
-            // (shader compilation, focus changes) must not exhaust a test phase.
-            if (Time.time < testAt) return;
-            try
-            {
-                var round = Object.FindFirstObjectByType<KinoRoundController>();
-                Assert(round, "Missing round in play mode.");
-                if (testPhase == 0)
-                {
-                    round.enableBoostRound = false; // This regression checks the original single-round deadline.
-                    round.BeginRound(10);
-                    round.launcher.StopLaunching(false);
-                    Assert(round.launcher.PoolCount == 16, "Pool was not prewarmed.");
-                    GameObject previousBall = null;
-                    for (int i = 0; i < 25; i++)
-                    {
-                        var ball = round.launcher.SpawnBall();
-                        Assert(ball, "Manual spawn failed.");
-                        Assert(!previousBall || ball == previousBall, "Caught ball was not reused.");
-                        previousBall = ball;
-                        var caught = ball.GetComponent<Catchable>();
-                        int number = caught.Number;
-                        caught.Configure(number, round); // This regression verifies ordinary-ball scoring.
-                        Assert(number >= 1 && number <= 80, "Spawned invalid number.");
-                        Assert(ball.GetComponent<KinoBallNumber>().numberLabel.text == number.ToString(), "Ball number does not match label.");
-                        var labelScale = ball.GetComponent<KinoBallNumber>().numberLabel.transform.lossyScale;
-                        Assert(Mathf.Abs(labelScale.x - labelScale.y) < .0001f, "Ball number became stretched.");
-                        caught.Catch();
-                        caught.Catch();
-                        Assert(round.board.caughtMarkers[number - 1].activeSelf, "Catch did not light board.");
-                    }
-                    Assert(round.State.CatchCount == 25 && round.score.CurrentScore == 25 && round.IsRunning, "Catch counted twice or stopped at 20.");
-                    Assert(round.launcher.PoolCount == 16 && round.launcher.ActiveBallCount == 0, "Catch leaked or expanded the pool.");
-                    // Send the oval's long end through a real hand trigger. This path
-                    // misses the old spherical collider, so it exercises the new shape.
-                    testHand = new GameObject("QA hand at oval edge");
-                    testHand.transform.position = new Vector3(.19f, 30, 0);
-                    testHand.AddComponent<SphereCollider>().radius = .025f;
-                    testHand.GetComponent<SphereCollider>().isTrigger = true;
-                    testHand.AddComponent<HandCatcher>();
-                    testEdgeBall = round.launcher.SpawnBall();
-                    testEdgeBall.GetComponent<KinoPooledBall>().StopAirflow();
-                    var edgeBody = testEdgeBall.GetComponent<Rigidbody>();
-                    edgeBody.position = new Vector3(0, 30, -.35f);
-                    edgeBody.useGravity = false;
-                    edgeBody.linearVelocity = Vector3.forward * 2;
-                    testPhase = 1;
-                    testAt = Time.time + .6;
-                }
-                else if (testPhase == 1)
-                {
-                    Assert(testEdgeBall && !testEdgeBall.activeSelf && round.State.CatchCount == 26, "The elongated end did not register a hand catch and return to the pool.");
-                    Object.DestroyImmediate(testHand);
-                    round.BeginRound(.25f);
-                    Assert(round.State.CatchCount == 0 && round.score.CurrentScore == 0, "Restart failed.");
-                    Assert(round.board.caughtMarkers.All(m => !m.activeSelf), "Restart did not clear board.");
-                    round.launcher.SpawnBall();
-                    testPhase = 2;
-                    testAt = Time.time + 1;
-                }
-                else
-                {
-                    Assert(!round.IsRunning && !round.launcher.IsLaunching, "Timer did not stop round.");
-                    Assert(!round.TryCatch(1) && round.State.CatchCount == 0 && round.score.CurrentScore == 0, "Late catch changed score.");
-                    Assert(!round.launcher.SpawnBall(), "Spawn accepted after timeout.");
-                    Assert(Object.FindObjectsByType<Catchable>(FindObjectsSortMode.None).Length == 0, "Live balls remained after timeout.");
-                    Assert(round.board.timeText.text == "00:00" && round.board.statusText.text == "ROUND COMPLETE", "Incorrect final board.");
-                    File.WriteAllText(Output + "/play-validation.txt", "PASS: unstretched numbered labels; 25 catches; physical hand trigger catches the oval's long end; double-catch guard; board correspondence; +1 counter; restart clears board; timer stops launch and catches; live balls cleared; final UI.\n");
-                    SessionState.SetBool(TestKey, false);
-                    Status("PLAY_TEST_PASSED");
-                    EditorApplication.isPlaying = false;
-                }
-            }
-            catch (Exception e) { Failure(e); }
         }
     }
 }

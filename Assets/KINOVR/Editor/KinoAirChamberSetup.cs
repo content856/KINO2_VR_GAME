@@ -354,7 +354,6 @@ namespace KinoVR.Editor
                 var lottery = chambers.Single(c => c.kind == KinoAirChamber.ChamberKind.Lottery);
                 if (phase == 0)
                 {
-                    round.enableBoostRound = false; // Isolate the original deadline in the air-motion regression.
                     round.FinishRound();
                     tubeBefore = tube.balls[4].transform.position; lotteryBefore = lottery.balls[4].transform.position;
                 }
@@ -378,7 +377,7 @@ namespace KinoVR.Editor
                     foreach (var c in chambers) for (int i = 0; i < c.balls.Length; i++)
                         Check(c.balls[i].Number == c.numbers[i], "Runtime number mismatch.");
                     tubeBefore = tube.balls[4].transform.position;
-                    round.BeginRound(.15f); round.launcher.StopLaunching(true);
+                    round.FinishRound(); // Air motion is independent of the final-bonus rules.
                 }
                 else
                 {

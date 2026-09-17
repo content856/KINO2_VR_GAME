@@ -13,6 +13,8 @@ namespace KinoVR
         Quaternion initialRotation, levelRotation;
         float age, riseTime, flightDuration, phase;
         double expiresAt;
+        double nextBonusNumberAt;
+        int bonusNumberIndex;
         bool leased, airflow, rising;
         public uint Generation { get; private set; }
         public bool IsRising => leased && rising;
@@ -59,6 +61,12 @@ namespace KinoVR
             body.interpolation = RigidbodyInterpolation.Interpolate;
             body.collisionDetectionMode = rising ? CollisionDetectionMode.ContinuousSpeculative : CollisionDetectionMode.ContinuousDynamic;
             catchable.Configure(number, owner.round, isKinoBonus);
+            if (isKinoBonus && owner.round)
+            {
+                for (int i = 0; i < owner.round.State.UniqueCount; i++)
+                    if (owner.round.State.GetCaughtNumber(i) == number) { bonusNumberIndex = i; break; }
+                nextBonusNumberAt = Time.timeAsDouble + Mathf.Max(.25f, owner.round.bonusNumberInterval);
+            }
             if (visual)
             {
                 visual.SetBonus(isKinoBonus);
@@ -70,7 +78,32 @@ namespace KinoVR
 
         void Update()
         {
-            if (leased && Time.timeAsDouble >= expiresAt) ReturnToPool(Generation);
+            if (leased && Time.timeAsDouble >= expiresAt) catchable.Miss();
+        }
+        void OnCollisionEnter(Collision collision)
+        {
+            if (!leased || rising || collision.rigidbody) return;
+            // Upward-facing static surfaces are the room floor/steps. Sideways tube
+            // and wall contacts, and contact with another ball, are not ground hits.
+            for (int i = 0; i < collision.contactCount; i++)
+                if (collision.GetContact(i).normal.y > .65f) { catchable.Miss(); return; }
+        }
+        void LateUpdate()
+        {
+            if (!leased || !catchable.IsKinoBonus || !owner.round || Time.timeAsDouble < nextBonusNumberAt) return;
+            var state = owner.round.State;
+            if (state.Phase != KinoRoundPhase.Bonus || state.UniqueCount <= 1) return;
+            bonusNumberIndex = (bonusNumberIndex + 1) % state.UniqueCount;
+            int number = state.GetCaughtNumber(bonusNumberIndex);
+            // Update the catch value and visible glyphs together, after physics. A catch
+            // consumes exactly the displayed value; it never rerolls or rearms the ball.
+            catchable.SetLiveNumber(number);
+            if (visual)
+            {
+                visual.SetNumber(number, owner.player);
+                if (visual.numberLabel) visual.numberLabel.ForceMeshUpdate();
+            }
+            nextBonusNumberAt = Time.timeAsDouble + Mathf.Max(.25f, owner.round.bonusNumberInterval);
         }
         void FixedUpdate()
         {
@@ -171,6 +204,8 @@ namespace KinoVR
         {
             airflow = rising = false;
             expiresAt = 0;
+            nextBonusNumberAt = 0;
+            bonusNumberIndex = 0;
             body.isKinematic = false;
             body.linearVelocity = body.angularVelocity = Vector3.zero;
             body.useGravity = false;

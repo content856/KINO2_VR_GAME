@@ -61,8 +61,8 @@ namespace KinoVR.Editor
                 var launcher = round.launcher;
                 if (stage == 0)
                 {
-                    round.enableBoostRound = false; // Keep this flight/pool regression independent of bonus timing.
                     round.BeginRound(60); launcher.StopLaunching(true);
+                    launcher.round = null; // Exercise pool/physics independently of the fixed 20-slot draw.
                     if (SessionState.GetBool(Key + ".Strong", false)) { launcher.turbulence = 1.2f; launcher.turbulenceFrequency = 1.5f; }
                     Check(launcher.PoolCount == 16 && launcher.ActiveBallCount == 0, "Incorrect prewarm.");
                     var all = new List<GameObject>();
@@ -79,7 +79,7 @@ namespace KinoVR.Editor
                     pooled.ReturnToPool(old);
                     Check(reused.activeSelf, "Stale lease returned a reused object.");
                     reused.GetComponent<Catchable>().Catch(); reused.GetComponent<Catchable>().Catch();
-                    Check(round.State.CatchCount == 2 && launcher.ActiveBallCount == 0, "Catch reset/double-trigger failure.");
+                    Check(round.score.CurrentScore == 2 && launcher.ActiveBallCount == 0, "Catch reset/double-trigger failure.");
                     launcher.ballLifetime = 1;
                     reused = launcher.SpawnBall();
                     stage++; at = Time.timeAsDouble + .7;
@@ -103,6 +103,7 @@ namespace KinoVR.Editor
                     Check(reused && !reused.activeSelf && launcher.ActiveBallCount == 0, "New lease did not expire into pool.");
                     launcher.ballLifetime = 6;
                     round.BeginRound(60); launcher.StopLaunching(true);
+                    launcher.round = null;
                     flying = new[] { launcher.SpawnBall(0).GetComponent<KinoPooledBall>(), launcher.SpawnBall(1).GetComponent<KinoPooledBall>() };
                     last = flying.Select(b => b.transform.position).ToArray();
                     exited = new bool[2]; nearest = new[] { 100f, 100f };
@@ -168,6 +169,7 @@ namespace KinoVR.Editor
                 }
                 else
                 {
+                    round.FinishRound();
                     Check(!round.IsRunning && launcher.ActiveBallCount == 0 && !launcher.SpawnBall(), "Deadline did not clear/stop spawns.");
                     round.BeginRound(10); launcher.StopLaunching(false);
                     Check(launcher.SpawnBall(), "Restart did not reactivate pool.");

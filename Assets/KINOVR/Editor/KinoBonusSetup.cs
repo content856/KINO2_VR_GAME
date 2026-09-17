@@ -74,6 +74,13 @@ namespace KinoVR.Editor
             try
             {
                 ConfigureKinoBonusBoard(gameplay.GetComponentInChildren<KinoNumberBoard>(true));
+                gameplay.GetComponent<KinoRoundController>().roundDuration = 60;
+                gameplay.GetComponent<KinoRoundController>().bonusNumberInterval = 1;
+                var initialState = new KinoRoundState();
+                initialState.Begin(60, 0);
+                var board = gameplay.GetComponentInChildren<KinoNumberBoard>(true);
+                board.ResetBoard();
+                board.SetRoundProgress(initialState, false);
                 PrefabUtility.SaveAsPrefabAsset(gameplay, gameplayPath);
             }
             finally { PrefabUtility.UnloadPrefabContents(gameplay); }
@@ -136,37 +143,87 @@ namespace KinoVR.Editor
             Directory.CreateDirectory(BonusOutput);
             var original = Object.FindFirstObjectByType<KinoRoundController>().board;
             bool wasActive = original.gameObject.activeSelf;
-            var board = Object.Instantiate(original, original.transform.parent);
-            original.gameObject.SetActive(false);
             var go = new GameObject("KINO Bonus board preview camera");
             var camera = go.AddComponent<Camera>();
-            camera.enabled = false;
-            camera.orthographic = true;
+            camera.enabled = false; camera.orthographic = true;
             var screen = Screen().bounds;
             camera.orthographicSize = screen.size.y * .505f;
             camera.transform.SetPositionAndRotation(screen.center + Vector3.back * 2, Quaternion.identity);
             camera.nearClipPlane = .02f; camera.farClipPlane = 80;
+            original.gameObject.SetActive(false);
             try
             {
-                board.ResetBoard();
-                board.MarkCaught(7); board.MarkCaught(26); board.MarkCaught(80, true);
-                var state = new KinoRoundState();
-                state.Begin(75, 0); state.TryCatch(7, 1); state.TryCatch(26, 2); state.TryCatch(80, 3, true);
-                board.SetRoundProgress(state, false);
-                Capture(camera, BonusOutput + "/Board-before-bonus.png", 1600, 904);
-                board.MarkCaught(7, true); state.TryCatch(7, 4, true);
-                // A following ordinary repeat must leave the upgraded marker red.
-                board.MarkCaught(7); state.TryCatch(7, 5);
-                board.SetRoundProgress(state, false);
-                Capture(camera, BonusOutput + "/Board-after-bonus.png", 1600, 904);
+                for (int step = 0; step < 2; step++)
+                {
+                    var board = Object.Instantiate(original, original.transform.parent);
+                    try
+                    {
+                        board.gameObject.SetActive(true); board.ResetBoard();
+                        var state = new KinoRoundState(); state.Begin(60, 0);
+                        int[] caught = { 7, 26, 80 };
+                        for (int i = 0; i < 20; i++)
+                        {
+                            state.TryRegisterNormalLaunch(i * 3);
+                            if (i < caught.Length) { state.TryCatch(caught[i], i * 3); board.MarkCaught(caught[i]); }
+                            else state.TryMiss(false);
+                        }
+                        state.Tick(60); state.TryBeginBonus(); state.TryRegisterBonusLaunch();
+                        if (step == 1)
+                        {
+                            state.TryCatch(7, 61, true); board.MarkCaught(7, true); state.Stop();
+                        }
+                        board.SetRoundProgress(state, step == 1);
+                        foreach (var label in board.GetComponentsInChildren<TMPro.TMP_Text>(true)) label.ForceMeshUpdate(true, true);
+                        Capture(camera, BonusOutput + (step == 0 ? "/Board-before-bonus.png" : "/Board-after-bonus.png"), 1600, 904);
+                    }
+                    finally { Object.DestroyImmediate(board.gameObject); }
+                }
             }
             finally
             {
-                Object.DestroyImmediate(board.gameObject);
-                original.gameObject.SetActive(wasActive);
-                Object.DestroyImmediate(go);
+                original.gameObject.SetActive(wasActive); Object.DestroyImmediate(go);
             }
             Status("KINO_BONUS_BOARD_PREVIEWS_READY");
+        }
+
+        internal static void CaptureFinalBonusTestView(KinoRoundController round, KinoPooledBall liveBall, string name)
+        {
+            Directory.CreateDirectory(BonusOutput);
+            var go = new GameObject("Final bonus QA camera");
+            var camera = go.AddComponent<Camera>();
+            camera.enabled = false; camera.orthographic = true;
+            camera.nearClipPlane = .02f; camera.farClipPlane = 80;
+            GameObject sample = null;
+            try
+            {
+                if (liveBall)
+                {
+                    sample = Object.Instantiate(round.launcher.ballPrefab);
+                    sample.GetComponent<Rigidbody>().isKinematic = true;
+                    sample.GetComponent<Catchable>().enabled = false;
+                    sample.transform.position = new Vector3(0, 30, 0);
+                    camera.orthographicSize = .17f;
+                    camera.transform.SetPositionAndRotation(sample.transform.position + Vector3.back, Quaternion.identity);
+                    camera.clearFlags = CameraClearFlags.SolidColor;
+                    camera.backgroundColor = new Color(.012f, .026f, .06f);
+                    var visual = sample.GetComponent<KinoBallNumber>();
+                    visual.SetBonus(true); visual.SetNumber(liveBall.GetComponent<Catchable>().Number, camera.transform);
+                    visual.numberLabel.ForceMeshUpdate(true, true);
+                }
+                else
+                {
+                    var screen = Screen().bounds;
+                    camera.orthographicSize = screen.size.y * .505f;
+                    camera.transform.SetPositionAndRotation(screen.center + Vector3.back * 2, Quaternion.identity);
+                    foreach (var label in round.board.GetComponentsInChildren<TMPro.TMP_Text>(true)) label.ForceMeshUpdate(true, true);
+                }
+                Capture(camera, BonusOutput + "/" + name + ".png", liveBall ? 1000 : 1600, liveBall ? 650 : 904);
+            }
+            finally
+            {
+                if (sample) Object.DestroyImmediate(sample);
+                Object.DestroyImmediate(go);
+            }
         }
     }
 }

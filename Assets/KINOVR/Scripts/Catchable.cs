@@ -13,6 +13,10 @@ public class Catchable : MonoBehaviour
     public enum BallType { Normal, MoreWins, Mystery, SecondChance, KinoBonus }
 
     public bool IsKinoBonus => ballType == BallType.KinoBonus;
+    internal void SetLiveNumber(int number)
+    {
+        if (!caught) Number = Mathf.Clamp(number, 1, 80);
+    }
 
     public int Number { get; private set; } = 1;
     KinoRoundController round;
@@ -86,6 +90,14 @@ public class Catchable : MonoBehaviour
 
         onCaught?.Invoke(this);
 
+        Release(generation);
+    }
+    public void Miss()
+    {
+        if (caught || !isActiveAndEnabled) return;
+        caught = true;
+        uint generation = poolBall ? poolBall.Generation : 0;
+        if (roundControlled && round) round.MissBall(IsKinoBonus);
         Release(generation);
     }
     void Release(uint generation)
