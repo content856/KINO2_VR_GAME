@@ -7,12 +7,17 @@ namespace KinoVR
     {
         [Min(1)] public float roundDuration = 60;
         public bool startAutomatically = true;
-        [Header("Final KINO Bonus")]
-        [Tooltip("Seconds each previously caught number stays visible on the final bonus ball.")]
+        [Header("KINO Bonus (after the 20-ball draw)")]
+        [Tooltip("Seconds each previously caught number stays visible on the red bonus ball.")]
         [Min(.25f)] public float bonusNumberInterval = 1;
-        // Retain the room/brand presentation reference, without its old timed phase.
+        [Header("Client showcase (normal cycle ends after Second Chance)")]
+        public bool showcaseBoostAfterSecondChance = true;
+        [Min(1)] public float showcaseBoostDuration = 25;
+        [Min(.25f)] public float showcaseBoostInterval = 1;
+        // The gold presentation is used only by the optional client showcase.
         [HideInInspector]
         public KinoBoostPresentation boostPresentation;
+        public KinoSecondChancePresentation secondChancePresentation;
         public BallLauncher launcher;
         public KinoNumberBoard board;
         public ScoreManager score;
@@ -33,6 +38,7 @@ namespace KinoVR
             State.Begin(duration, Time.timeAsDouble);
             finishPresented = false;
             if (boostPresentation) boostPresentation.SetBoost(false);
+            if (secondChancePresentation) secondChancePresentation.ResetPresentation();
             if (score) score.ResetScore();
             if (board) board.ResetBoard();
             if (launcher)
@@ -52,12 +58,25 @@ namespace KinoVR
             try
             {
                 State.Tick(Time.timeAsDouble);
-                // Keep the last ordinary flight catchable after 00:00. Freeze the
-                // bonus candidate set only after every ordinary ball is resolved.
-                if (State.Phase == KinoRoundPhase.Settling && State.ResolvedNormalCount == KinoRoundState.NormalBallLimit &&
-                    (!launcher || launcher.ActiveBallCount == 0)) State.TryBeginBonus();
-                if (!State.IsRunning || (State.Phase == KinoRoundPhase.Bonus && State.BonusLaunched &&
-                    (!launcher || launcher.ActiveBallCount == 0))) FinishRound();
+                // Keep the last flight catchable before each transition.
+                bool noFlights = !launcher || launcher.ActiveBallCount == 0;
+                if (State.Phase == KinoRoundPhase.Settling && State.ResolvedNormalCount == KinoRoundState.NormalBallLimit && noFlights)
+                {
+                    if (!State.TryBeginBonus()) State.TryBeginSecondChanceTransition(Time.timeAsDouble);
+                }
+                if (State.Phase == KinoRoundPhase.Bonus && State.BonusLaunched && noFlights)
+                    State.TryBeginSecondChanceTransition(Time.timeAsDouble);
+                if (State.Phase == KinoRoundPhase.SecondChance && State.ResolvedSecondChanceCount == KinoRoundState.SecondChanceBallLimit &&
+                    noFlights)
+                {
+                    if (!showcaseBoostAfterSecondChance || !State.TryBeginShowcaseBoost(Time.timeAsDouble, showcaseBoostDuration, showcaseBoostInterval)) FinishRound();
+                    else
+                    {
+                        if (boostPresentation) boostPresentation.SetBoost(true, true);
+                        if (launcher) launcher.SetPace(1, .72f, .75f);
+                    }
+                }
+                if (!State.IsRunning || (State.Phase == KinoRoundPhase.BoostSettling && State.ResolvedBoostCount == State.BoostLaunchCount && noFlights)) FinishRound();
                 RefreshBoard();
             }
             finally { refreshing = false; }
@@ -66,20 +85,24 @@ namespace KinoVR
         {
             RefreshClock();
             int previousScore = State.Score;
-            if (!State.TryCatch(number, Time.timeAsDouble, ballType == Catchable.BallType.KinoBonus))
+            if (!State.TryCatch(number, Time.timeAsDouble, ballType == Catchable.BallType.KinoBonus, ballType == Catchable.BallType.SecondChance, ballType == Catchable.BallType.KinoBoost))
             {
                 if (!State.IsRunning && !finishPresented) FinishRound();
                 return false;
             }
             if (score) score.AddScore(State.Score - previousScore, ballType);
-            if (board) board.MarkCaught(number, ballType == Catchable.BallType.KinoBonus);
+            if (board)
+            {
+                board.MarkCaught(number, ballType == Catchable.BallType.KinoBonus, ballType == Catchable.BallType.SecondChance);
+                if (ballType == Catchable.BallType.KinoBoost) board.ShowMultiplier(number);
+            }
             RefreshBoard();
             return true;
         }
-        public void MissBall(bool isKinoBonus)
+        public void MissBall(bool isKinoBonus, bool isSecondChance = false, bool isBoost = false)
         {
             State.Tick(Time.timeAsDouble);
-            State.TryMiss(isKinoBonus);
+            State.TryMiss(isKinoBonus, isSecondChance, isBoost);
         }
         public void FinishRound()
         {
@@ -95,10 +118,12 @@ namespace KinoVR
         void RefreshBoard()
         {
             if (board) board.SetRoundProgress(State, finishPresented);
+            if (secondChancePresentation) secondChancePresentation.Present(State, Time.timeAsDouble);
         }
         void OnDisable()
         {
             State.Stop();
+            if (secondChancePresentation) secondChancePresentation.ResetPresentation();
             if (launcher) launcher.StopLaunching(true);
             if (launcher) launcher.SetPace(1, 1, 1);
             if (boostPresentation) boostPresentation.SetBoost(false);

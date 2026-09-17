@@ -10,6 +10,7 @@ Shader "KINO/Board Graphic"
         _GlowStrength ("Neon brightness", Range(0,2)) = 1
         _BoostStrength ("KINO BOOST gold palette", Range(0,1)) = 0
         _BonusRed ("KINO Bonus red marker", Range(0,1)) = 0
+        _SecondChanceGreen ("Second Chance green marker", Range(0,1)) = 0
         _HideBakedLogo ("Replace baked logo with source artwork", Float) = 0
         [HideInInspector] _PreviewTime ("Preview time (-1: live)", Float) = -1
         [HideInInspector] _StencilComp ("Stencil Comparison", Float) = 8
@@ -39,7 +40,7 @@ Shader "KINO/Board Graphic"
             float _Mode;
             sampler2D _MainTex;
             float4 _BoardRect;
-            float _MotionSpeed, _GlowStrength, _PreviewTime, _BoostStrength, _HideBakedLogo, _BonusRed;
+            float _MotionSpeed, _GlowStrength, _PreviewTime, _BoostStrength, _HideBakedLogo, _BonusRed, _SecondChanceGreen;
             fixed4 _Color;
             float2 Perimeter(float phase)
             {
@@ -116,7 +117,7 @@ Shader "KINO/Board Graphic"
                 float radius=length(p);
                 float edge=1-smoothstep(.96,1,radius);
                 if (_Mode > 1.5) return fixed4(.99,.98,.90,edge)*i.color;
-                float3 gold=KinoLacquerSurface(float3(p, sqrt(saturate(1-dot(p,p)))), _BonusRed);
+                float3 gold=KinoLacquerSurface(float3(p, sqrt(saturate(1-dot(p,p)))), _BonusRed, _SecondChanceGreen);
                 return fixed4(GammaToLinearSpace(gold),edge)*i.color;
             }
             ENDCG

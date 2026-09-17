@@ -84,7 +84,7 @@ namespace KinoVR
             bloom.intensity.Override(.65f);
             bloom.tint.Override(new Color(1, .72f, .28f));
         }
-        public void SetBoost(bool active)
+        public void SetBoost(bool active, bool immediate = false)
         {
             if (active && !initialized) Initialize();
             bool entering = active && !IsBoostActive;
@@ -102,6 +102,11 @@ namespace KinoVR
             {
                 announcement.gameObject.SetActive(active);
                 announcement.alpha = active ? 1 : 0;
+            }
+            if (active && immediate)
+            {
+                transition = 1;
+                ApplyLighting(1);
             }
             if (!active)
             {

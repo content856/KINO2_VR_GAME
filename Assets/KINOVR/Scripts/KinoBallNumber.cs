@@ -8,6 +8,7 @@ namespace KinoVR
         public TMP_Text numberLabel;
         public Transform face;
         public Material kinoBonusMaterial;
+        public Material secondChanceMaterial;
         [Tooltip("Baked oval mesh radii; the root and label keep uniform scale.")]
         public Vector3 surfaceRadii = new Vector3(.63f, .375f, .375f);
         [SerializeField, HideInInspector] int number = 1;
@@ -18,7 +19,7 @@ namespace KinoVR
         Color normalNumberColor;
         bool appearanceCached;
 
-        public void SetBonus(bool isBonus)
+        public void SetBonus(bool isBonus, bool isSecondChance = false)
         {
             if (!appearanceCached)
             {
@@ -27,8 +28,9 @@ namespace KinoVR
                 normalNumberColor = numberLabel ? numberLabel.color : Color.black;
                 appearanceCached = true;
             }
-            if (ballRenderer) ballRenderer.sharedMaterial = isBonus && kinoBonusMaterial ? kinoBonusMaterial : normalMaterial;
-            if (numberLabel) numberLabel.color = isBonus ? Color.white : normalNumberColor;
+            if (ballRenderer) ballRenderer.sharedMaterial = isBonus && kinoBonusMaterial ? kinoBonusMaterial :
+                isSecondChance && secondChanceMaterial ? secondChanceMaterial : normalMaterial;
+            if (numberLabel) numberLabel.color = isBonus || isSecondChance ? Color.white : normalNumberColor;
         }
         static readonly string[] NumberText = MakeNumberText();
         static string[] MakeNumberText()

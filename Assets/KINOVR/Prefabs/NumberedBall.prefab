@@ -369,6 +369,7 @@ MonoBehaviour:
   mysteryMaxBonus: 25
   catchVFX: {fileID: 3332431955755207746, guid: edb126944d3bfaf41a74d2c9bafa572b, type: 3}
   kinoBonusCatchVFX: {fileID: 2841306624698117062, guid: da84c27472421e04d8a759495d62dd77, type: 3}
+  secondChanceCatchVFX: {fileID: 6267122457161391881, guid: 8cf4de0bec8db3641b37cc2941c15a5b, type: 3}
   catchSFX: {fileID: 0}
   onCaught:
     m_PersistentCalls:
@@ -388,6 +389,7 @@ MonoBehaviour:
   numberLabel: {fileID: 995388920040589587}
   face: {fileID: 5065417553150914828}
   kinoBonusMaterial: {fileID: 2100000, guid: 089f4b679c7c5ca47aca7c5fc9054a11, type: 2}
+  secondChanceMaterial: {fileID: 2100000, guid: 30f3bb1ee83cda74ea3a20a578b051a6, type: 2}
   surfaceRadii: {x: 0.63, y: 0.375, z: 0.375}
   number: 1
 --- !u!136 &8140591606145640209

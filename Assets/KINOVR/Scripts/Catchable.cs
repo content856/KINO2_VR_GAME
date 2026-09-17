@@ -10,9 +10,11 @@ using KinoVR;
 /// </summary>
 public class Catchable : MonoBehaviour
 {
-    public enum BallType { Normal, MoreWins, Mystery, SecondChance, KinoBonus }
+    public enum BallType { Normal, MoreWins, Mystery, SecondChance, KinoBonus, KinoBoost }
 
     public bool IsKinoBonus => ballType == BallType.KinoBonus;
+    public bool IsSecondChance => ballType == BallType.SecondChance;
+    public bool IsBoost => ballType == BallType.KinoBoost;
     internal void SetLiveNumber(int number)
     {
         if (!caught) Number = Mathf.Clamp(number, 1, 80);
@@ -31,13 +33,13 @@ public class Catchable : MonoBehaviour
         roundControlled = false;
         ballType = BallType.Normal;
     }
-    public void Configure(int number, KinoRoundController controller, bool isKinoBonus = false)
+    public void Configure(int number, KinoRoundController controller, bool isKinoBonus = false, bool isSecondChance = false, bool isBoost = false)
     {
         caught = false;
         Number = Mathf.Clamp(number, 1, 80);
         round = controller;
         roundControlled = controller != null;
-        ballType = isKinoBonus ? BallType.KinoBonus : BallType.Normal;
+        ballType = isKinoBonus ? BallType.KinoBonus : isSecondChance ? BallType.SecondChance : isBoost ? BallType.KinoBoost : BallType.Normal;
     }
 
     [Header("Scoring")]
@@ -51,6 +53,7 @@ public class Catchable : MonoBehaviour
     [Header("Feedback")]
     public GameObject catchVFX;
     public GameObject kinoBonusCatchVFX;
+    public GameObject secondChanceCatchVFX;
     public AudioClip catchSFX;
 
     [Tooltip("Extra hook for anything else that should react to this specific ball being caught.")]
@@ -72,7 +75,7 @@ public class Catchable : MonoBehaviour
             return;
         }
 
-        int awarded = pointValue * (IsKinoBonus ? KinoRoundState.BonusMultiplier : 1);
+        int awarded = pointValue * (IsKinoBonus || IsSecondChance || IsBoost ? KinoRoundState.BonusMultiplier : 1);
         if (ballType == BallType.Mystery)
         {
             awarded = Random.Range(mysteryMinBonus, mysteryMaxBonus + 1);
@@ -80,7 +83,8 @@ public class Catchable : MonoBehaviour
 
         if (!roundControlled && ScoreManager.Instance) ScoreManager.Instance.AddScore(awarded, ballType);
 
-        var feedback = IsKinoBonus && kinoBonusCatchVFX ? kinoBonusCatchVFX : catchVFX;
+        var feedback = IsKinoBonus && kinoBonusCatchVFX ? kinoBonusCatchVFX :
+            IsSecondChance && secondChanceCatchVFX ? secondChanceCatchVFX : catchVFX;
         if (feedback != null)
         {
             var effect = Instantiate(feedback, transform.position, Quaternion.identity);
@@ -97,7 +101,7 @@ public class Catchable : MonoBehaviour
         if (caught || !isActiveAndEnabled) return;
         caught = true;
         uint generation = poolBall ? poolBall.Generation : 0;
-        if (roundControlled && round) round.MissBall(IsKinoBonus);
+        if (roundControlled && round) round.MissBall(IsKinoBonus, IsSecondChance, IsBoost);
         Release(generation);
     }
     void Release(uint generation)

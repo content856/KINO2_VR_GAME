@@ -38,7 +38,7 @@ namespace KinoVR
             gameObject.SetActive(false);
         }
 
-        internal void Activate(Transform spawn, Transform outlet, int number, bool isKinoBonus)
+        internal void Activate(Transform spawn, Transform outlet, int number, bool isKinoBonus, bool isSecondChance = false, bool isBoost = false)
         {
             Generation++;
             leased = airflow = true;
@@ -60,7 +60,7 @@ namespace KinoVR
             body.detectCollisions = !rising;
             body.interpolation = RigidbodyInterpolation.Interpolate;
             body.collisionDetectionMode = rising ? CollisionDetectionMode.ContinuousSpeculative : CollisionDetectionMode.ContinuousDynamic;
-            catchable.Configure(number, owner.round, isKinoBonus);
+            catchable.Configure(number, owner.round, isKinoBonus, isSecondChance, isBoost);
             if (isKinoBonus && owner.round)
             {
                 for (int i = 0; i < owner.round.State.UniqueCount; i++)
@@ -69,7 +69,7 @@ namespace KinoVR
             }
             if (visual)
             {
-                visual.SetBonus(isKinoBonus);
+                visual.SetBonus(isKinoBonus, isSecondChance);
                 visual.SetNumber(number, owner.player);
             }
             gameObject.SetActive(true);

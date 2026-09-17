@@ -92,6 +92,7 @@ namespace KinoVR.Editor
             visual.numberLabel.fontSize = 96;
             visual.numberLabel.transform.localScale = Vector3.one;
             ConfigureKinoBonusBall(ball);
+            ConfigureSecondChanceBall(ball);
         }
 
         static Mesh MakeOvalMesh(int columns, int rows, string meshName)

@@ -38820,6 +38820,14 @@ PrefabInstance:
       propertyPath: m_Name
       value: KINO Gameplay
       objectReference: {fileID: 0}
+    - target: {fileID: 1323125235070016229, guid: 2cdf295e8f96ad04997d2ebf8a433cd5, type: 3}
+      propertyPath: m_fontColor32.rgba
+      value: 4292791462
+      objectReference: {fileID: 0}
+    - target: {fileID: 1323125235070016229, guid: 2cdf295e8f96ad04997d2ebf8a433cd5, type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
+      objectReference: {fileID: 0}
     - target: {fileID: 2194725172234946973, guid: 2cdf295e8f96ad04997d2ebf8a433cd5, type: 3}
       propertyPath: environmentCamera
       value: 
