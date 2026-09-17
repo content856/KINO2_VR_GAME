@@ -6,16 +6,23 @@ The `KINO Gameplay` prefab instance contains the round, launcher, live board and
 
 ## Current rules
 
-- The round starts automatically and lasts **75 seconds**. Change **Round Duration** on `KINO Gameplay` to adjust it.
+- Play starts automatically: **75 seconds normal**, **6 seconds calm**, then a **25-second KINO BOOST bonus round**. The main duration, calm duration, bonus duration and pace multipliers are on `KINO Gameplay`. Turn off **Enable Boost Round** for the original single-round behavior.
+- Normal and calm catches award **1 point**; BOOST catches award **3 points**. The header shows **SCORE** and a separate **CAUGHT** count. All phases retain the cumulative score and highlighted numbers; restarting resets them.
+- Calm launches are 2.4 times farther apart. BOOST intervals are 0.48 times the configured intervals; new balls' tube ascent and flight durations are 0.7 times their configured values. These runtime multipliers preserve the launcher's Inspector difficulty settings. Balls already in flight keep their current trajectory.
+- At BOOST entry, a 2.2-second gold KINO BOOST / x3 announcement and voice cue play, then the grid returns with a persistent BOOST badge. The display, room LEDs and marble tint, four floor rings and two shadowless amber fills use the gold reference palette, including on the Quest camera without post-processing. Optional warm grading/bloom follows cameras with post-processing enabled. Shared project materials and baked lightmaps are preserved; runtime lighting and pace reset on finish, restart or disable.
 - The time bar fills from empty to full as the round elapses; the numeric timer still counts down. Restarting empties the bar.
 - Each launched ball receives a random integer from **1 through 80**, displayed in black directly on its gold surface, facing the player.
 - Every successful catch adds one to **BALLS CAUGHT** and highlights its position in the board's 10-column, 8-row grid.
 - Numbers may repeat. A repeat counts as another caught ball and pulses the same board position.
 - There is no 20-ball limit, selected ticket, payout table or special-ball scoring in this round.
-- At zero, spawning and catching stop, flying balls are removed, and the board retains the result with **ROUND COMPLETE**.
+- At the final BOOST deadline (or the main deadline when BOOST is disabled), spawning and catching stop, flying balls are removed, and the board retains the result with **ROUND COMPLETE**. `onRoundFinished` fires once after the complete sequence.
 - Missed balls return to a prewarmed 16-ball pool after six seconds (including the tube ascent). `BeginRound()` resets the timer, board, counter and flying balls for another round.
 
 The live board keeps the existing KINO artwork and frame. Native UI replaces the static sample numbers and time fields with the live grid and countdown. The original screen material, texture, architecture and lighting are preserved.
+
+The header logo uses the independent `KINO-logo-RGB.png` source through a cropped UV rectangle, instead of the small logo baked into the 1065 × 602 background. Its import uses trilinear Kaiser mipmaps, aniso 8, a modest -0.35 mip bias and Android ASTC 4×4. Mipmaps remain enabled to control shimmer. The original PNG is untouched. This fixes the source-resolution/filtering weakness; head-angle sharpness still needs checking on the headset.
+
+**Tools > KINO VR > BOOST** contains setup, before/after previews and lifecycle tests. The setup updates the gameplay prefab without rebuilding the environment. `KinoGameplaySetup.BatchBoost` applies the setup, captures previews and runs the rule and Play Mode tests, exiting with a failure code on error. Reports/images are in `Artifacts/KinoGameplay/Boost`. The voice is a replaceable local Windows David TTS placeholder in `Audio/KinoBoost.wav`; the BOOST lettering is native TMP text inspired by the supplied image, not an official brand asset.
 
 The catchable balls use a smooth horizontal oval mesh (1.68:1, matching the board markers), with uniform transforms so the text stays unstretched. A horizontal capsule collider follows their width and height. The black number remains centred toward the viewer at oblique angles, without a white badge. The physical balls and board tokens share a yellow lacquer palette and softbox/rim highlights through `KinoGoldSurface.hlsl`.
 

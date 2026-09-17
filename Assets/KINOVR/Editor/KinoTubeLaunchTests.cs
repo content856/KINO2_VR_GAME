@@ -61,6 +61,7 @@ namespace KinoVR.Editor
                 var launcher = round.launcher;
                 if (stage == 0)
                 {
+                    round.enableBoostRound = false; // Keep this flight/pool regression independent of bonus timing.
                     round.BeginRound(60); launcher.StopLaunching(true);
                     if (SessionState.GetBool(Key + ".Strong", false)) { launcher.turbulence = 1.2f; launcher.turbulenceFrequency = 1.5f; }
                     Check(launcher.PoolCount == 16 && launcher.ActiveBallCount == 0, "Incorrect prewarm.");

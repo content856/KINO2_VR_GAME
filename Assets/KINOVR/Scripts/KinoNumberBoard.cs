@@ -10,15 +10,32 @@ namespace KinoVR
         public TMP_Text catchCountText;
         public TMP_Text timeText;
         public TMP_Text statusText;
+        public TMP_Text caughtTotalText;
         public RectTransform timeFill;
         public Color waitingColor = new Color(.10f, .85f, 1f);
         public Color caughtColor = new Color(.025f, .045f, .08f);
         readonly float[] pulseUntil = new float[80];
+        bool boosted;
+        public void SetBoostColors(bool active)
+        {
+            boosted = active;
+            for (int i = 0; i < numberLabels.Length; i++)
+                if (numberLabels[i] && (i >= caughtMarkers.Length || !caughtMarkers[i] || !caughtMarkers[i].activeSelf))
+                    numberLabels[i].color = active ? new Color(1, .72f, .18f) : waitingColor;
+            if (timeFill) timeFill.GetComponent<UnityEngine.UI.Graphic>().color = active ? new Color(1, .64f, .08f) : new Color(.03f, .68f, 1);
+        }
+        public void SetRoundProgress(KinoRoundState state, bool finished)
+        {
+            SetProgress(state.Score, state.RemainingSeconds, state.PhaseDuration, finished);
+            if (statusText && !finished)
+                statusText.text = state.Phase == KinoRoundPhase.Boost ? "SCORE  <color=#FFC43D>x3</color>" : "SCORE";
+            if (caughtTotalText) caughtTotalText.text = $"CAUGHT {state.CatchCount:000}";
+        }
         public void ResetBoard()
         {
             for (int i = 0; i < 80; i++)
             {
-                if (i < numberLabels.Length && numberLabels[i]) numberLabels[i].color = waitingColor;
+                if (i < numberLabels.Length && numberLabels[i]) numberLabels[i].color = boosted ? new Color(1, .72f, .18f) : waitingColor;
                 if (i < caughtMarkers.Length && caughtMarkers[i])
                 {
                     caughtMarkers[i].SetActive(false);

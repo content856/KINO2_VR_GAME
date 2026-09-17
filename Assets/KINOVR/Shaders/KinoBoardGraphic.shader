@@ -8,6 +8,8 @@ Shader "KINO/Board Graphic"
         _BoardRect ("Panel rectangle in board UV", Vector) = (0,0,1,1)
         _MotionSpeed ("Neon motion speed", Range(0,2)) = .7
         _GlowStrength ("Neon brightness", Range(0,2)) = 1
+        _BoostStrength ("KINO BOOST gold palette", Range(0,1)) = 0
+        _HideBakedLogo ("Replace baked logo with source artwork", Float) = 0
         [HideInInspector] _PreviewTime ("Preview time (-1: live)", Float) = -1
         [HideInInspector] _StencilComp ("Stencil Comparison", Float) = 8
         [HideInInspector] _Stencil ("Stencil ID", Float) = 0
@@ -36,7 +38,7 @@ Shader "KINO/Board Graphic"
             float _Mode;
             sampler2D _MainTex;
             float4 _BoardRect;
-            float _MotionSpeed, _GlowStrength, _PreviewTime;
+            float _MotionSpeed, _GlowStrength, _PreviewTime, _BoostStrength, _HideBakedLogo;
             fixed4 _Color;
             float2 Perimeter(float phase)
             {
@@ -66,7 +68,8 @@ Shader "KINO/Board Graphic"
                 light += float3(.015,.40,.55) * neonLine * (.16 + halo * .8);
                 light += float3(.002,.08,.18) * bloom * (.2 + halo);
                 light += float3(.003,.035,.075) * ribbon * edgeMask;
-                return light * _GlowStrength;
+                float energy = dot(light, float3(.25, .6, .3));
+                return lerp(light, float3(1.8, .75, .06) * energy, _BoostStrength) * _GlowStrength;
             }
             v2f vert(appdata v)
             {
@@ -77,15 +80,36 @@ Shader "KINO/Board Graphic"
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
                 float2 p=i.uv*2-1;
+                if (_Mode > 3.5)
+                {
+                    float2 ray = p * float2(1.85, 1);
+                    float angle = atan2(ray.y, ray.x);
+                    float radius = length(ray);
+                    float beams = pow(abs(sin(angle * 29 + sin(angle * 13) * 2)), 36);
+                    beams *= smoothstep(.35, .65, radius) * exp(-radius * 1.4);
+                    float ring = exp(-abs(radius - .62) * 90);
+                    float3 color = float3(.009, .006, .003) + float3(.8, .30, .015) * (beams * 1.5 + ring * .1);
+                    color += float3(.10, .035, .001) * exp(-radius * radius * 2);
+                    return fixed4(color, 1) * i.color;
+                }
                 if (_Mode < .5 || _Mode > 2.5)
                 {
                     float time = (_PreviewTime >= 0 ? _PreviewTime : _Time.y) * _MotionSpeed;
                     float2 boardUV = _BoardRect.xy + i.uv * _BoardRect.zw;
                     float3 atmosphere = Atmosphere(boardUV, time);
                     if (_Mode > 2.5)
-                        return fixed4(tex2D(_MainTex, i.uv).rgb + atmosphere, 1) * i.color;
+                    {
+                        float3 artwork = tex2D(_MainTex, i.uv).rgb;
+                        // Continue the existing header gradient under the separate sharp logo.
+                        // This avoids a visible rectangular patch or editing the source image.
+                        if (_HideBakedLogo > .5 && i.uv.x > .43 && i.uv.x < .59 && i.uv.y > .85)
+                            artwork = lerp(tex2D(_MainTex, float2(.43, i.uv.y)).rgb,
+                                tex2D(_MainTex, float2(.59, i.uv.y)).rgb, (i.uv.x - .43) / .16);
+                        return fixed4(lerp(artwork, float3(.012,.007,.002), _BoostStrength * .96) + atmosphere, 1) * i.color;
+                    }
                     float glow=pow(abs(p.x),5)*.35 + pow(abs(p.y),8)*.13;
                     float3 blue=lerp(float3(.008,.055,.17),float3(.01,.21,.43),glow);
+                    blue = lerp(blue, lerp(float3(.035,.020,.008), float3(.24,.12,.025), glow), _BoostStrength);
                     return fixed4(GammaToLinearSpace(blue) + atmosphere,1)*i.color;
                 }
                 float radius=length(p);

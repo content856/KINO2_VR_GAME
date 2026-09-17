@@ -354,6 +354,7 @@ namespace KinoVR.Editor
                 var lottery = chambers.Single(c => c.kind == KinoAirChamber.ChamberKind.Lottery);
                 if (phase == 0)
                 {
+                    round.enableBoostRound = false; // Isolate the original deadline in the air-motion regression.
                     round.FinishRound();
                     tubeBefore = tube.balls[4].transform.position; lotteryBefore = lottery.balls[4].transform.position;
                 }

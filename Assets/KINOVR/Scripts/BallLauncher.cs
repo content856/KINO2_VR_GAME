@@ -44,6 +44,19 @@ public class BallLauncher : MonoBehaviour
     public bool IsLaunching { get; private set; }
     public int PoolCount => pool.Count;
     public int ActiveBallCount { get; private set; }
+    public float IntervalMultiplier { get; private set; } = 1;
+    public float FlightTimeMultiplier { get; private set; } = 1;
+    public float TubeTimeMultiplier { get; private set; } = 1;
+    public float EffectiveFlightTime => flightTime * FlightTimeMultiplier;
+    public float EffectiveTubeRiseTime => tubeRiseTime * TubeTimeMultiplier;
+
+    public void SetPace(float interval, float flight, float tube)
+    {
+        IntervalMultiplier = Mathf.Max(.1f, interval);
+        FlightTimeMultiplier = Mathf.Max(.1f, flight);
+        TubeTimeMultiplier = Mathf.Max(.1f, tube);
+        if (IsLaunching) ScheduleNext();
+    }
 
     void Awake() => Prewarm();
     void OnEnable() { if (!round && autoStart) StartLaunching(); }
@@ -58,7 +71,7 @@ public class BallLauncher : MonoBehaviour
     void ScheduleNext()
     {
         float low = Mathf.Max(.05f, minSpawnInterval);
-        nextSpawn = Time.timeAsDouble + Random.Range(low, Mathf.Max(low, maxSpawnInterval));
+        nextSpawn = Time.timeAsDouble + Mathf.Max(.05f, Random.Range(low, Mathf.Max(low, maxSpawnInterval)) * IntervalMultiplier);
     }
     public void Prewarm()
     {

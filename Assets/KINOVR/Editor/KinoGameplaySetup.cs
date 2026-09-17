@@ -78,6 +78,9 @@ namespace KinoVR.Editor
                     case "tube-test-strong": KinoTubeLaunchTests.RunStrongTurbulence(); break;
                     case "flight-tuning": KinoTubeLaunchSetup.ApplyFlightTuning(); Status("FLIGHT_TUNING_READY"); break;
                     case "flight-controls": KinoTubeLaunchSetup.SelectDifficulty(); break;
+                    case "boost": ApplyBoost(); Status("BOOST_READY"); break;
+                    case "boost-preview": CaptureBoost(); break;
+                    case "boost-test": KinoBoostTests.Run(); break;
                     case "test": Validate(); SessionState.SetBool(TestKey, true); Status("PLAY_TEST_STARTING"); EditorApplication.isPlaying = true; break;
                     default: throw new ArgumentException("Unknown gameplay command: " + command);
                 }
@@ -174,6 +177,7 @@ namespace KinoVR.Editor
             KinoTubeLaunchSetup.ConfigureLauncher(launcher);
             round.launcher = launcher;
             round.board = MakeBoard(root.transform, Screen().bounds);
+            ConfigureBoost(round);
             round.board.SetProgress(0, round.roundDuration, round.roundDuration, false);
             var builds = EditorBuildSettings.scenes.Select(s => new EditorBuildSettingsScene(s.path, false)).ToList();
             builds.RemoveAll(s => s.path == ScenePath);
@@ -455,6 +459,7 @@ namespace KinoVR.Editor
                 Assert(round, "Missing round in play mode.");
                 if (testPhase == 0)
                 {
+                    round.enableBoostRound = false; // This regression checks the original single-round deadline.
                     round.BeginRound(10);
                     round.launcher.StopLaunching(false);
                     Assert(round.launcher.PoolCount == 16, "Pool was not prewarmed.");
