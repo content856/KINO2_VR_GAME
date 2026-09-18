@@ -22,6 +22,8 @@ namespace KinoVR.Editor
         static KinoPooledBall bonus;
         static GameObject hand;
         static bool started, physicalCatchPending;
+        static bool restartPending, restartInputSent;
+        static double restartReadyAt, restartDeadline;
         static KinoSecondChanceTests()
         {
             EditorApplication.update += Tick;
@@ -125,6 +127,8 @@ namespace KinoVR.Editor
             Check(round.board.secondChanceMarkerMaterial && round.board.multiplierLabels.All(t => t), "Missing green markers/multiplier labels.");
             Check(!ShaderUtil.ShaderHasError(round.board.secondChanceMarkerMaterial.shader) && !ShaderUtil.ShaderHasError(round.secondChancePresentation.fadeImage.material.shader), "Board/fade shader error.");
             Check(round.secondChancePresentation.announcement.GetComponentInChildren<RawImage>(true).texture, "Missing logo texture.");
+            Check(round.restartButton && round.restartButton.round == round && round.restartButton.button &&
+                round.restartButton.pressArea && !round.restartButton.gameObject.activeSelf, "Missing or initially visible restart button.");
         }
         [MenuItem("Tools/KINO VR/Second Chance/2 - Test full sequence")]
         public static void RunMenu() => Run();
@@ -140,15 +144,23 @@ namespace KinoVR.Editor
             File.WriteAllText(Folder + "/play-tests.txt", "RUNNING");
             EditorApplication.isPlaying = true;
         }
-        static void StartDraw(KinoRoundController round, int index)
+        static void StartDraw(KinoRoundController round, int index, bool beginRound = true)
         {
             run = index; normalSeen = greenSeen = boostSeen = bonusChanges = 0;
             leases.Clear(); bonus = null; physicalCatchPending = false;
+            restartPending = restartInputSent = false;
             round.showcaseBoostAfterSecondChance = run == 0;
-            round.BeginRound(60);
-            startedAt = Time.timeAsDouble;
+            if (beginRound) round.BeginRound(60);
+            startedAt = round.State.PhaseStartedAt;
             previous = KinoRoundPhase.Main; phaseAt = startedAt;
             Check(round.State.Score == 0 && round.board.caughtMarkers.All(m => !m.activeSelf) && round.secondChancePresentation.FadeAlpha == 0, "Restart did not reset score/board/fade.");
+            Check(!round.restartButton.IsVisible && round.State.Phase == KinoRoundPhase.Main && round.State.UniqueCount == 0 &&
+                round.State.CatchCount == 0 && !round.State.BonusLaunched && round.State.SecondChanceLaunchCount == 0 &&
+                round.State.BoostLaunchCount == 0 && round.score.CurrentScore == 0 && round.State.RemainingSeconds > 59 &&
+                round.launcher.FlightTimeMultiplier == 1 && !round.boostPresentation.IsBoostActive &&
+                round.board.multiplierLabels.All(t => !t.gameObject.activeSelf), "Restart retained sequence data or UI.");
+            round.restartButton.Press();
+            Check(round.State.PhaseStartedAt == startedAt, "Hidden button restarted active gameplay.");
         }
         static void Tick()
         {
@@ -158,6 +170,29 @@ namespace KinoVR.Editor
                 Check(EditorApplication.timeSinceStartup < timeout, "Sequence integration timed out.");
                 var round = Object.FindFirstObjectByType<KinoRoundController>();
                 if (!round || !round.launcher || !round.launcher.player) return;
+                if (restartPending)
+                {
+                    if (Time.realtimeSinceStartupAsDouble < restartReadyAt) return;
+                    if (!restartInputSent)
+                    {
+                        Check(round.restartButton.CanPress, "Completed round restart did not arm.");
+                        if (run == 0)
+                        {
+                            hand.transform.position = round.restartButton.transform.position;
+                            Physics.SyncTransforms();
+                        }
+                        else round.restartButton.button.onClick.Invoke();
+                        restartInputSent = true;
+                        restartDeadline = EditorApplication.timeSinceStartup + 3;
+                        return;
+                    }
+                    Check(EditorApplication.timeSinceStartup < restartDeadline, "Physical/click restart did not begin a new round.");
+                    if (!round.IsRunning) return;
+                    if (hand) { Object.Destroy(hand); hand = null; }
+                    events.Add($"run {run}: restarted via " + (run == 0 ? "physical hand trigger" : "button click"));
+                    StartDraw(round, run + 1, false);
+                    return;
+                }
                 if (!started)
                 {
                     started = true; events.Clear();
@@ -166,6 +201,7 @@ namespace KinoVR.Editor
                 }
                 double now = Time.timeAsDouble;
                 var state = round.State;
+                if (state.IsRunning) Check(!round.restartButton.IsVisible, "Restart appeared before the sequence finished.");
                 if (state.Phase != previous)
                 {
                     events.Add($"run {run}: {previous} -> {state.Phase} at {now - startedAt:F3}s (phase {now - phaseAt:F3}s)");
@@ -271,10 +307,35 @@ namespace KinoVR.Editor
                 Check(state.Score == expected && round.score.CurrentScore == expected, "Cumulative score mismatch.");
                 Check(run != 0 || boostSeen == 25, "Showcase must run 25 one-second launch slots.");
                 Check(run == 0 || boostSeen == 0, "Production cycle did not finish after Second Chance.");
-                if (run < 2) { StartDraw(round, run + 1); return; }
+                Check(round.restartButton.IsVisible, "Finished sequence did not show Restart.");
+                var view = round.playerView.View;
+                Vector3 offset = Quaternion.Inverse(Quaternion.LookRotation(Vector3.ProjectOnPlane(view.forward, Vector3.up))) *
+                    (round.restartButton.transform.position - view.position);
+                Check(offset.x < 0 && offset.z > 0 && offset.magnitude < 1, "Restart is not reachable in front-left.");
+                var camera = view.GetComponent<Camera>();
+                Vector3 screenPoint = camera.WorldToScreenPoint(round.restartButton.transform.position);
+                Check(round.restartButton.pressArea.Raycast(camera.ScreenPointToRay(screenPoint), out _, 10), "Desktop pointer cannot hit Restart.");
+                if (run < 2)
+                {
+                    if (run == 0) KinoGameplaySetup.CaptureSequencePlayerView(round, "Live-restart-front-left");
+                    round.restartButton.Press();
+                    Check(!round.IsRunning, "Restart did not debounce the last catch.");
+                    restartPending = true; restartInputSent = false;
+                    restartReadyAt = Time.realtimeSinceStartupAsDouble + .45;
+                    if (run == 0)
+                    {
+                        hand = new GameObject("Physical restart hand");
+                        hand.transform.position = round.restartButton.transform.position + Vector3.up;
+                        hand.AddComponent<HandCatcher>();
+                        var collider = hand.AddComponent<SphereCollider>();
+                        collider.isTrigger = true; collider.radius = .06f;
+                    }
+                    return;
+                }
                 round.BeginRound(); round.launcher.SpawnBall(); round.enabled = false;
-                Check(!round.IsRunning && round.launcher.ActiveBallCount == 0 && round.secondChancePresentation.FadeAlpha == 0, "Disable left gameplay/fade running.");
-                File.WriteAllText(Folder + "/play-tests.txt", "PASS: three full 60s normal draws; 20+red bonus+hold+fade+title+3 green sequence; caught-only red cycling and physical catch; missed/empty bonus paths; green +3 and pool colors; 25s optional Boost, repeated caught numbers +3 and board effects; production ends at Second Chance; empty round still gets 3 greens; exact finish events; restart/disable.\n");
+                Check(!round.IsRunning && round.launcher.ActiveBallCount == 0 && round.secondChancePresentation.FadeAlpha == 0 &&
+                    !round.restartButton.IsVisible, "Disable left gameplay/fade/restart running.");
+                File.WriteAllText(Folder + "/play-tests.txt", "PASS: three full 60s normal draws; 20+red bonus+hold+fade+title+3 green sequence; caught-only red cycling and physical catch; missed/empty bonus paths; green +3 and pool colors; 25s optional Boost, repeated caught numbers +3 and board effects; production ends at Second Chance; empty round still gets 3 greens; exact finish events; front-left Restart only after completion; physical hand and button-click restart; complete score/board/phase/timer reset; debounce and hidden-button guards; restart/disable.\n");
                 End(true);
             }
             catch (Exception e) { File.WriteAllText(Folder + "/play-tests.txt", e.ToString()); Debug.LogException(e); End(false); }

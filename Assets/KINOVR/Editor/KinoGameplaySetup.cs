@@ -76,6 +76,7 @@ namespace KinoVR.Editor
                     case "second-chance": ApplySecondChance(); break;
                     case "second-chance-test": KinoSecondChanceTests.Run(); break;
                     case "second-chance-preview": CaptureSecondChance(); break;
+                    case "restart": ApplyRestart(); break;
                     case "test": Validate(); KinoBonusTests.Run(); break;
                     default: throw new ArgumentException("Unknown gameplay command: " + command);
                 }
@@ -172,6 +173,7 @@ namespace KinoVR.Editor
             round.board = MakeBoard(root.transform, Screen().bounds);
             ConfigureBoost(round);
             ConfigureSecondChance(round);
+            ConfigureRestart(round);
             round.board.SetProgress(0, round.roundDuration, round.roundDuration, false);
             var builds = EditorBuildSettings.scenes.Select(s => new EditorBuildSettingsScene(s.path, false)).ToList();
             builds.RemoveAll(s => s.path == ScenePath);
