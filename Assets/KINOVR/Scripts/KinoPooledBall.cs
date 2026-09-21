@@ -15,7 +15,7 @@ namespace KinoVR
         double expiresAt;
         double nextBonusNumberAt;
         int bonusNumberIndex;
-        bool leased, airflow, rising;
+        bool leased, airflow, rising, whooshPlayed;
         public uint Generation { get; private set; }
         public bool IsRising => leased && rising;
 
@@ -44,6 +44,7 @@ namespace KinoVR
             leased = airflow = true;
             rising = outlet;
             age = 0;
+            whooshPlayed = false;
             phase = Random.Range(0f, Mathf.PI * 2);
             riseTime = Mathf.Max(.2f, owner.EffectiveTubeRiseTime);
             flightDuration = Mathf.Max(.2f, owner.EffectiveFlightTime * Random.Range(1 - owner.speedVariance, 1 + owner.speedVariance));
@@ -73,6 +74,8 @@ namespace KinoVR
                 visual.SetNumber(number, owner.player);
             }
             gameObject.SetActive(true);
+            if (rising && owner.round && owner.round.audioController)
+                owner.round.audioController.Play(KinoSound.TubeRise, start, transform, riseTime);
             if (!rising) BeginFlight();
         }
 
@@ -86,7 +89,7 @@ namespace KinoVR
             // Upward-facing static surfaces are the room floor/steps. Sideways tube
             // and wall contacts, and contact with another ball, are not ground hits.
             for (int i = 0; i < collision.contactCount; i++)
-                if (collision.GetContact(i).normal.y > .65f) { catchable.Miss(); return; }
+                if (collision.GetContact(i).normal.y > .65f) { catchable.Miss(true); return; }
         }
         void LateUpdate()
         {
@@ -129,6 +132,12 @@ namespace KinoVR
             }
 
             float u = Mathf.Clamp01(age / flightDuration);
+            if (!whooshPlayed && u >= .55f)
+            {
+                whooshPlayed = true;
+                if (owner.round && owner.round.audioController)
+                    owner.round.audioController.Play(KinoSound.BallWhoosh, transform.position, transform);
+            }
             if (age > flightDuration + .35f) { StopAirflow(); return; }
             float v = 1 - u;
             Vector3 path = v * v * v * exit + 3 * v * v * u * control1 + 3 * v * u * u * control2 + u * u * u * target;
@@ -145,6 +154,11 @@ namespace KinoVR
 
         void BeginFlight()
         {
+            if (owner.round && owner.round.audioController)
+            {
+                owner.round.audioController.StopFollowing(transform);
+                owner.round.audioController.Play(KinoSound.TubeExit, exit);
+            }
             bool fromTube = rising;
             rising = false;
             age = 0;
@@ -195,6 +209,7 @@ namespace KinoVR
         public void ReturnToPool(uint generation)
         {
             if (!leased || generation != Generation) return;
+            if (owner.round && owner.round.audioController) owner.round.audioController.StopFollowing(transform);
             leased = false;
             ResetState();
             gameObject.SetActive(false);

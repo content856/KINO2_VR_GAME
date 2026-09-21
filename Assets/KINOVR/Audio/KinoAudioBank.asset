@@ -1,0 +1,180 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2c2d517a6db38004a9be6e50dc32252f, type: 3}
+  m_Name: KinoAudioBank
+  m_EditorClassIdentifier: Assembly-CSharp::KinoVR.KinoAudioBank
+  cues:
+  - sound: 0
+    variants:
+    - {fileID: 8300000, guid: 913d1a5065b80f747a9fead32ddca22e, type: 3}
+    volume: 0.5
+    pitchVariation: 0.025
+    spatial: 1
+    priority: 90
+    minimumInterval: 0.025
+  - sound: 1
+    variants:
+    - {fileID: 8300000, guid: b7489fac514a1d146951f6ab80be160b, type: 3}
+    - {fileID: 8300000, guid: a0cd0f58a5972de44b1312e1a80e4723, type: 3}
+    - {fileID: 8300000, guid: ac2111fc9a1f5ae47833726c747373d5, type: 3}
+    volume: 0.24
+    pitchVariation: 0.025
+    spatial: 1
+    priority: 160
+    minimumInterval: 0.025
+  - sound: 2
+    variants:
+    - {fileID: 8300000, guid: 1cdf34178b4e91b41bff86586bd83cec, type: 3}
+    - {fileID: 8300000, guid: 4fb819b90d610f64d80adf53c3beb52f, type: 3}
+    - {fileID: 8300000, guid: 4170e6e26a2c9da42916cf0449fb8323, type: 3}
+    volume: 0.55
+    pitchVariation: 0.025
+    spatial: 1
+    priority: 140
+    minimumInterval: 0.025
+  - sound: 3
+    variants:
+    - {fileID: 8300000, guid: a5b8c8f01b32a0d4b92077c253ea926d, type: 3}
+    - {fileID: 8300000, guid: d80f7b222aae4ee4e9cb8c4f84a6536d, type: 3}
+    - {fileID: 8300000, guid: 8cc2982d8ee0de949bdc3b3ba18802e3, type: 3}
+    volume: 0.36
+    pitchVariation: 0.025
+    spatial: 1
+    priority: 160
+    minimumInterval: 0.025
+  - sound: 4
+    variants:
+    - {fileID: 8300000, guid: 0ab37c5ad7d326341876637c17468e84, type: 3}
+    - {fileID: 8300000, guid: a0ed69fb267fe3f4b8299a059fdb071a, type: 3}
+    - {fileID: 8300000, guid: 0277ca68b0fb0424ba612f9ba984fd3b, type: 3}
+    volume: 0.72
+    pitchVariation: 0.025
+    spatial: 1
+    priority: 72
+    minimumInterval: 0
+  - sound: 5
+    variants:
+    - {fileID: 8300000, guid: 073fc2c6d17aa564cbbf86fa1e0537d8, type: 3}
+    - {fileID: 8300000, guid: 9ea7501437bfb31409f83e44a074c6d7, type: 3}
+    - {fileID: 8300000, guid: 532feb3ea9ba2a745829201a4e62c7be, type: 3}
+    volume: 0.75
+    pitchVariation: 0.025
+    spatial: 1
+    priority: 68
+    minimumInterval: 0
+  - sound: 6
+    variants:
+    - {fileID: 8300000, guid: ee06bf7bc8c2c5342baae0be9a85f334, type: 3}
+    volume: 0.85
+    pitchVariation: 0.025
+    spatial: 1
+    priority: 40
+    minimumInterval: 0
+  - sound: 7
+    variants:
+    - {fileID: 8300000, guid: 2d439f0de1a0644419863fed23874d59, type: 3}
+    - {fileID: 8300000, guid: 36835569cbbb8274fada53315bd6412d, type: 3}
+    - {fileID: 8300000, guid: ff4ba5842aa025e4a8aa700b9d8eea42, type: 3}
+    volume: 0.68
+    pitchVariation: 0.025
+    spatial: 1
+    priority: 72
+    minimumInterval: 0
+  - sound: 8
+    variants:
+    - {fileID: 8300000, guid: 3bad4ad7e1d95834b98c05152777c175, type: 3}
+    - {fileID: 8300000, guid: 03392234d7026544d8ba306a16e59138, type: 3}
+    - {fileID: 8300000, guid: 0c4abcfc867c7af49894990c7d4c8d3e, type: 3}
+    volume: 0.3
+    pitchVariation: 0.025
+    spatial: 1
+    priority: 180
+    minimumInterval: 0.025
+  - sound: 9
+    variants:
+    - {fileID: 8300000, guid: 637fb63c2f1ca644cb170ae813fe5c29, type: 3}
+    volume: 0.55
+    pitchVariation: 0
+    spatial: 0
+    priority: 48
+    minimumInterval: 0.025
+  - sound: 10
+    variants:
+    - {fileID: 8300000, guid: b4f64e39f3acf96459a1ea3b0e658482, type: 3}
+    volume: 0.55
+    pitchVariation: 0
+    spatial: 0
+    priority: 48
+    minimumInterval: 0.025
+  - sound: 11
+    variants:
+    - {fileID: 8300000, guid: eba8bd90da7174f4ea188106186f20d2, type: 3}
+    volume: 0.55
+    pitchVariation: 0
+    spatial: 0
+    priority: 48
+    minimumInterval: 0.025
+  - sound: 12
+    variants:
+    - {fileID: 8300000, guid: 52856c510fb1617468504d1efd102e9b, type: 3}
+    volume: 0.35
+    pitchVariation: 0
+    spatial: 0
+    priority: 48
+    minimumInterval: 0.025
+  - sound: 13
+    variants:
+    - {fileID: 8300000, guid: f2b2ad6c46da13047bd986adc33726b3, type: 3}
+    volume: 0.55
+    pitchVariation: 0
+    spatial: 0
+    priority: 48
+    minimumInterval: 0.025
+  - sound: 14
+    variants:
+    - {fileID: 8300000, guid: b098308ade16ba94f9c395631cfd3a59, type: 3}
+    volume: 0.55
+    pitchVariation: 0
+    spatial: 0
+    priority: 48
+    minimumInterval: 0.025
+  - sound: 15
+    variants:
+    - {fileID: 8300000, guid: c6c255b5bfeb23b408d2fb997e73dbc3, type: 3}
+    volume: 0.55
+    pitchVariation: 0
+    spatial: 0
+    priority: 48
+    minimumInterval: 0.025
+  - sound: 16
+    variants:
+    - {fileID: 8300000, guid: 6b2a40c9222e5844087bcac6cb33fc85, type: 3}
+    volume: 0.3
+    pitchVariation: 0
+    spatial: 0
+    priority: 150
+    minimumInterval: 0.025
+  - sound: 17
+    variants:
+    - {fileID: 8300000, guid: 703a31a9e4b56e242b927995c1477bb4, type: 3}
+    - {fileID: 8300000, guid: 0ca13dd5723f65b4485bbc81adcff58b, type: 3}
+    - {fileID: 8300000, guid: 3074565c60549674abbdd98c29c879cb, type: 3}
+    - {fileID: 8300000, guid: 3019aa0eca902fd4bb77f6f57f2598ce, type: 3}
+    volume: 0.75
+    pitchVariation: 0.08
+    spatial: 1
+    priority: 220
+    minimumInterval: 0.025
+  chillMusic: {fileID: 8300000, guid: e8b43e56758d47a1b036e065c23f6908, type: 3}
+  boostMusic: {fileID: 8300000, guid: 32285938acb0d204da33513c739439a6, type: 3}
+  outdoorAmbience: {fileID: 8300000, guid: 478defbfb0f629a42ab3010f69368a3b, type: 3}
+  machineLoop: {fileID: 8300000, guid: 27dc64a767f16794ebdab4f7af33eda6, type: 3}

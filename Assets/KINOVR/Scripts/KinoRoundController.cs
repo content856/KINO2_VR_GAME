@@ -23,6 +23,7 @@ namespace KinoVR
         public ScoreManager score;
         public KinoPlayerView playerView;
         public KinoRestartButton restartButton;
+        public KinoAudioController audioController;
         public UnityEvent onRoundFinished = new UnityEvent();
         public KinoRoundState State { get; } = new KinoRoundState();
         public bool IsRunning => State.IsRunning;
@@ -43,6 +44,7 @@ namespace KinoVR
             if (secondChancePresentation) secondChancePresentation.ResetPresentation();
             if (score) score.ResetScore();
             if (board) board.ResetBoard();
+            if (audioController) audioController.BeginRound();
             if (launcher)
             {
                 launcher.round = this;
@@ -120,11 +122,13 @@ namespace KinoVR
         }
         void RefreshBoard()
         {
+            if (audioController) audioController.Present(State);
             if (board) board.SetRoundProgress(State, finishPresented);
             if (secondChancePresentation) secondChancePresentation.Present(State, Time.timeAsDouble);
         }
         void OnDisable()
         {
+            if (audioController) audioController.StopAll();
             State.Stop();
             if (restartButton) restartButton.Hide();
             if (secondChancePresentation) secondChancePresentation.ResetPresentation();

@@ -77,6 +77,8 @@ namespace KinoVR.Editor
                     case "second-chance-test": KinoSecondChanceTests.Run(); break;
                     case "second-chance-preview": CaptureSecondChance(); break;
                     case "restart": ApplyRestart(); break;
+                    case "audio": KinoAudioSetup.Apply(); KinoAudioSetup.Validate(); Status("AUDIO_READY"); break;
+                    case "audio-test": KinoAudioTests.Run(); break;
                     case "test": Validate(); KinoBonusTests.Run(); break;
                     default: throw new ArgumentException("Unknown gameplay command: " + command);
                 }

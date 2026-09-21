@@ -49,6 +49,7 @@ namespace KinoVR
             if (!CanPress) return;
             Hide();
             round.BeginRound();
+            if (round.audioController) round.audioController.Play(KinoSound.Restart, transform.position);
         }
 
         void OnTriggerEnter(Collider other)

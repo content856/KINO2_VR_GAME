@@ -34,6 +34,14 @@ The catchable balls use a smooth horizontal oval mesh (1.68:1, matching the boar
 
 The live display adds slowly travelling cyan light around the number frame, soft background glows and a drifting blue ribbon, inspired by the reference video. Animation runs in the shared UI shader without additional scene lights or per-frame material allocation. The four `Board*` background materials expose **Neon motion speed** and **Neon brightness**; set motion speed to zero for a still background.
 
+## Background music
+
+`KinoAudioController` plays the supplied ChilloutMusic continuously, including between rounds and across restarts, and crossfades to a separate baked instrumental during Boost. Adjust Music, Effects, Ambience and Announcement on the controller (defaults 0.25 / 0.8 / 0.3 / 0.8). The existing BOOST announcement remains separate and ducks the music. The controller owns playback, so its sources have Play On Awake disabled.
+
+`Audio/ChilloutMusicLoop.wav` is derived from the supplied `ChilloutMusic.mp3` (44.1 kHz stereo). The source file is unchanged. The 2.27-second silent tail is removed at 66.460907 seconds, and the last two seconds blend linearly with the first two seconds before wrapping. A 3 dB gain reduction leaves headroom when decoding the MP3 to PCM. The resulting loop is 64.460907 seconds; it imports as streaming Vorbis at quality 0.7. Check final loudness and the loop transition on the headset.
+
+The first-pass bank includes baked tube rise/exit/approach effects, four catch families, floor taps, phase announcements, final/restart/countdown cues, courtyard breeze, stylized birds, a lottery motor and Boost music. `Tools > KINO VR > Audio` exposes setup, clip replacement, mix controls and playback/sequence validation. All generation happens offline in `Tools/KinoAudio/bake_audio.py`; no audio is synthesized at startup or during Play. See `Tools/KinoAudio/README.md` for the cue list, listening reel, replacement workflow and performance checks.
+
 ## Assets and checks
 
 - `Prefabs/KinoTimedGameplay.prefab`: connected gameplay setup for the Rotunda scene.

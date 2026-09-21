@@ -1,0 +1,306 @@
+[
+  {
+    "name": "RoundStart",
+    "seconds": 1.65,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -6,
+    "description": "Air pressure rises, followed by a restrained ready chime."
+  },
+  {
+    "name": "TubeRise_01",
+    "seconds": 1.8,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -10,
+    "description": "Soft pressure inside a tube during ascent."
+  },
+  {
+    "name": "TubeExit_01",
+    "seconds": 0.27,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -6,
+    "description": "Compact pneumatic puff/pop at the outlet."
+  },
+  {
+    "name": "BallWhoosh_01",
+    "seconds": 0.52,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -9,
+    "description": "Short passing airflow; follows the approaching ball."
+  },
+  {
+    "name": "CatchNormal_01",
+    "seconds": 0.34,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -6,
+    "description": "Soft golden pop and tiny coin sparkle."
+  },
+  {
+    "name": "CatchGreen_01",
+    "seconds": 0.48,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -6,
+    "description": "Bright glassy green reward; lighter than the red bonus."
+  },
+  {
+    "name": "CatchBoost_01",
+    "seconds": 0.32,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -6,
+    "description": "Short energetic reward for dense Boost catches."
+  },
+  {
+    "name": "BallMiss_01",
+    "seconds": 0.22,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -12,
+    "description": "Gentle floor tap, no failure buzzer."
+  },
+  {
+    "name": "TubeRise_02",
+    "seconds": 1.8,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -10,
+    "description": "Soft pressure inside a tube during ascent."
+  },
+  {
+    "name": "TubeExit_02",
+    "seconds": 0.27,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -6,
+    "description": "Compact pneumatic puff/pop at the outlet."
+  },
+  {
+    "name": "BallWhoosh_02",
+    "seconds": 0.545,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -9,
+    "description": "Short passing airflow; follows the approaching ball."
+  },
+  {
+    "name": "CatchNormal_02",
+    "seconds": 0.34,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -6,
+    "description": "Soft golden pop and tiny coin sparkle."
+  },
+  {
+    "name": "CatchGreen_02",
+    "seconds": 0.48,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -6,
+    "description": "Bright glassy green reward; lighter than the red bonus."
+  },
+  {
+    "name": "CatchBoost_02",
+    "seconds": 0.32,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -6,
+    "description": "Short energetic reward for dense Boost catches."
+  },
+  {
+    "name": "BallMiss_02",
+    "seconds": 0.22,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -12,
+    "description": "Gentle floor tap, no failure buzzer."
+  },
+  {
+    "name": "TubeRise_03",
+    "seconds": 1.8,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -10,
+    "description": "Soft pressure inside a tube during ascent."
+  },
+  {
+    "name": "TubeExit_03",
+    "seconds": 0.27,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -6,
+    "description": "Compact pneumatic puff/pop at the outlet."
+  },
+  {
+    "name": "BallWhoosh_03",
+    "seconds": 0.57,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -9,
+    "description": "Short passing airflow; follows the approaching ball."
+  },
+  {
+    "name": "CatchNormal_03",
+    "seconds": 0.34,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -6,
+    "description": "Soft golden pop and tiny coin sparkle."
+  },
+  {
+    "name": "CatchGreen_03",
+    "seconds": 0.48,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -6,
+    "description": "Bright glassy green reward; lighter than the red bonus."
+  },
+  {
+    "name": "CatchBoost_03",
+    "seconds": 0.32,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -6,
+    "description": "Short energetic reward for dense Boost catches."
+  },
+  {
+    "name": "BallMiss_03",
+    "seconds": 0.22,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -12,
+    "description": "Gentle floor tap, no failure buzzer."
+  },
+  {
+    "name": "CatchBonus",
+    "seconds": 0.92,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -5,
+    "description": "Full red bonus pop, rounded low impact and reward sparkle."
+  },
+  {
+    "name": "BonusReveal",
+    "seconds": 1.15,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -6,
+    "description": "Short invitation announcing the red bonus."
+  },
+  {
+    "name": "SecondChanceOut",
+    "seconds": 1.0,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -9,
+    "description": "Air sweep into the one-second blackout."
+  },
+  {
+    "name": "SecondChanceReveal",
+    "seconds": 1.45,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -6,
+    "description": "Fresh, ascending logo reveal."
+  },
+  {
+    "name": "BoostStart",
+    "seconds": 1.35,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -8,
+    "description": "Warm power-up under the existing Boost voice."
+  },
+  {
+    "name": "BoostEnd",
+    "seconds": 0.85,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -10,
+    "description": "Gentle release from Boost energy."
+  },
+  {
+    "name": "RoundComplete",
+    "seconds": 1.7,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -6,
+    "description": "Small positive resolution, not a jackpot fanfare."
+  },
+  {
+    "name": "Restart",
+    "seconds": 0.16,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -9,
+    "description": "Short, clear button confirmation."
+  },
+  {
+    "name": "Countdown",
+    "seconds": 0.13,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -14,
+    "description": "Soft last-five-seconds marker."
+  },
+  {
+    "name": "Bird_01",
+    "seconds": 1.05,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -13,
+    "description": "Stylized distant bird phrase, baked offline."
+  },
+  {
+    "name": "Bird_02",
+    "seconds": 1.21,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -13,
+    "description": "Stylized distant bird phrase, baked offline."
+  },
+  {
+    "name": "Bird_03",
+    "seconds": 1.37,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -13,
+    "description": "Stylized distant bird phrase, baked offline."
+  },
+  {
+    "name": "Bird_04",
+    "seconds": 1.53,
+    "channels": 1,
+    "loop": false,
+    "peak_db": -13,
+    "description": "Stylized distant bird phrase, baked offline."
+  },
+  {
+    "name": "OutdoorAmbienceLoop",
+    "seconds": 12.0,
+    "channels": 2,
+    "loop": true,
+    "peak_db": -13,
+    "description": "Soft stereo courtyard breeze; birds are separate clips."
+  },
+  {
+    "name": "MachineLoop",
+    "seconds": 8.0,
+    "channels": 1,
+    "loop": true,
+    "peak_db": -13,
+    "description": "Quiet air motor with soft chamber contacts."
+  },
+  {
+    "name": "BoostMusicLoop",
+    "seconds": 16.0,
+    "channels": 2,
+    "loop": true,
+    "peak_db": -5,
+    "description": "Original warm electronic instrumental, 120 BPM, D minor / Bb / F / C, 8 bars."
+  }
+]

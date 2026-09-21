@@ -146,6 +146,7 @@ namespace KinoVR.Editor
         }
         static void StartDraw(KinoRoundController round, int index, bool beginRound = true)
         {
+            KinoAudioTests.ObserveSequence(round);
             run = index; normalSeen = greenSeen = boostSeen = bonusChanges = 0;
             leases.Clear(); bonus = null; physicalCatchPending = false;
             restartPending = restartInputSent = false;
@@ -332,6 +333,7 @@ namespace KinoVR.Editor
                     }
                     return;
                 }
+                KinoAudioTests.ValidateSequence(round);
                 round.BeginRound(); round.launcher.SpawnBall(); round.enabled = false;
                 Check(!round.IsRunning && round.launcher.ActiveBallCount == 0 && round.secondChancePresentation.FadeAlpha == 0 &&
                     !round.restartButton.IsVisible, "Disable left gameplay/fade/restart running.");

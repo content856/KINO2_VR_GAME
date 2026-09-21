@@ -90,18 +90,22 @@ public class Catchable : MonoBehaviour
             var effect = Instantiate(feedback, transform.position, Quaternion.identity);
             Destroy(effect, 5);
         }
-        if (catchSFX != null) AudioSource.PlayClipAtPoint(catchSFX, transform.position);
+        if (roundControlled && round && round.audioController)
+            round.audioController.PlayCatch(ballType, transform.position);
+        else if (catchSFX != null) AudioSource.PlayClipAtPoint(catchSFX, transform.position);
 
         onCaught?.Invoke(this);
 
         Release(generation);
     }
-    public void Miss()
+    public void Miss(bool hitFloor = false)
     {
         if (caught || !isActiveAndEnabled) return;
         caught = true;
         uint generation = poolBall ? poolBall.Generation : 0;
         if (roundControlled && round) round.MissBall(IsKinoBonus, IsSecondChance, IsBoost);
+        if (hitFloor && roundControlled && round && round.audioController)
+            round.audioController.Play(KinoSound.BallMiss, transform.position);
         Release(generation);
     }
     void Release(uint generation)
