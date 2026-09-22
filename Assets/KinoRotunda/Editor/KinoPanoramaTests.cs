@@ -89,6 +89,30 @@ namespace KinoRotunda.Editor
                 VerifyRenderedDirection(sun, output);
                 report.AppendLine("PASS: importer application, native sky shader orientation, sun/probe/lightmap/previous-sky preservation.");
 
+                string stripPath = output + "/Test-strip.exr";
+                var strip = new Texture2D(1024, 256, TextureFormat.RGBAHalf, false, true);
+                try
+                {
+                    var pixels = Enumerable.Repeat(new Color(.02f,.02f,.02f), 1024*256).ToArray();
+                    for (int y = 160; y <= 172; y++)
+                        for (int x = 270; x <= 282; x++) pixels[y*1024+x] = new Color(16,12,8,1);
+                    strip.SetPixels(pixels); strip.Apply();
+                    File.WriteAllBytes(stripPath, strip.EncodeToEXR(Texture2D.EXRFlags.CompressZIP));
+                }
+                finally { Object.DestroyImmediate(strip); }
+                options.cropped360 = true;
+                options.manualSun = true;
+                options.sunUV = new Vector2(276.5f/1024,166.5f/256);
+                options.cropBottomElevation = Mathf.Asin(-sun.transform.forward.y)*Mathf.Rad2Deg - options.sunUV.y*90;
+                var stripResult = KinoPanoramaSkybox.ApplyFile(stripPath, options, false);
+                Assert(Mathf.Abs(stripResult.cropVerticalDegrees-90) < .001f && Mathf.Abs(stripResult.sunElevationDifference) < .001f,
+                    "Cropped strip must preserve angular scale and map the picked sun to spherical UV.");
+                VerifyRenderedDirection(sun, output);
+                Assert(EditorJsonUtility.ToJson(sun) == sunBefore && Quaternion.Angle(rotation,sun.transform.rotation) < .001f,
+                    "Cropped sky must preserve scene sun settings.");
+                report.AppendLine("PASS: cropped 360 strip angular scale, latitude calibration and native URP rendered sun alignment.");
+                options.cropped360 = false;
+
                 string wrong = output + "/Test-invalid-layout.png";
                 var invalid = new Texture2D(512, 512, TextureFormat.RGB24, false);
                 try { File.WriteAllBytes(wrong, invalid.EncodeToPNG()); }

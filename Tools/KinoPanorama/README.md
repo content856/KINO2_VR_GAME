@@ -3,6 +3,7 @@
 Open **Tools > KINO Rotunda > 360 Skybox** in the KinoRotunda scene. Drop a local panorama onto the window, or use **Choose file and apply**. Default settings import the file, apply the sky, bake lighting and update active reflection probes.
 
 - Accepts mono, equirectangular 360 × 180° JPG, PNG, HDR and EXR files with a 2:1 aspect ratio.
+- Cropped 360° strips can use `cropped360`, a picked `sunUV` in the source image and `cropBottomElevation`. The original width/height determines the vertical angular coverage without stretching. A separate stereo-compatible sky shader fills uncaptured poles with a colour gradient. Set the bottom elevation to `sceneSunElevation - sourceSunUV.y * 360 * height / width` to calibrate the photographed sun's elevation while keeping horizontal image rows level.
 - JPG/PNG is decoded from sRGB and saved as a linear, half-float EXR. This changes the storage format, not the captured dynamic range; clipped highlights cannot be recovered.
 - HDR/EXR preserves HDR radiance. Texture import caps the desktop texture at 8K and the Quest texture at 4K by default; these limits can be reduced in the window. Quest uses native RGB9E5 HDR storage (approximately 43 MiB at 4K including mipmaps, or 11 MiB at 2K), avoiding an RGBM-packed LDR texture.
 - The current Directional Light keeps its rotation, colour and intensity. A sun detector analyses the upper hemisphere, including the horizontal seam, and adjusts only the panorama's yaw. The level horizon is preserved. A different source sun elevation is reported rather than tilting the city.
@@ -17,7 +18,7 @@ Keep only the KinoRotunda scene loaded, exit Play Mode, and let existing lightin
 
 [Sunset over Syntagma Square drone aerial view, Athens, Greece — FOTO360](https://www.360cities.net/image/sunset-over-syntagma-square-drone-aerial-view-athens-greece), advertised resolution 17,966 × 8,983.
 
-The public page is a viewer. **Hosted Embed does not include a file download.** Obtain the full equirectangular JPG with a licence covering inclusion in the VR game/app. Once available, drop the downloaded image into the window and record the source/licence URL. The project does not include this photograph or an extracted viewer copy.
+The current scene uses the user-supplied `Artifacts/athens_panorama_20260921/athens_panorama.png` strip (8192 × 2131). Its photographed sun is picked at approximately pixel (4555, 1300), measured from the top left. The strip covers 93.64746° vertically; its bottom is calibrated to -30.45856° for the existing 6.06° scene sun. The scene light itself remains unchanged. Uncaptured poles are a colour gradient, not additional photographed coverage. `athens-apply.json` records the reusable import settings.
 
 ## Validation and automation
 

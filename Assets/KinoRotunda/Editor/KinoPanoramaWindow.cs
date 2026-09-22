@@ -96,6 +96,12 @@ namespace KinoRotunda.Editor
                     if (options.manualSun) options.sunUV = EditorGUILayout.Vector2Field("Sun UV (bottom-left origin)", options.sunUV);
                 }
                 options.rotationOffset = EditorGUILayout.Slider("Extra yaw", options.rotationOffset, -180, 180);
+                options.cropped360 = EditorGUILayout.Toggle("Cropped 360° strip", options.cropped360);
+                if (options.cropped360)
+                {
+                    options.cropBottomElevation = EditorGUILayout.FloatField("Strip bottom elevation", options.cropBottomElevation);
+                    EditorGUILayout.HelpBox("Pick the sun in the preview. The original aspect ratio sets the angular scale; uncaptured poles use a colour gradient.", MessageType.Info);
+                }
                 options.exposure = EditorGUILayout.Slider("Sky exposure", options.exposure, .05f, 4);
                 options.desktopSize = EditorGUILayout.IntPopup("Desktop resolution", options.desktopSize, new[] { "4K", "8K" }, new[] { 4096, 8192 });
                 options.questSize = EditorGUILayout.IntPopup("Quest resolution", options.questSize, new[] { "2K", "4K" }, new[] { 2048, 4096 });

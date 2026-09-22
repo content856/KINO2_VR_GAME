@@ -39,6 +39,8 @@ namespace KinoRotunda.Editor
             public bool bakeLighting = true;
             public bool updateReflections = true;
             public string sourceUrl = "";
+            public bool cropped360;
+            public float cropBottomElevation = -30;
         }
 
         [Serializable]
@@ -49,6 +51,8 @@ namespace KinoRotunda.Editor
             public Vector2 sunUV;
             public float confidence, rotation, sunElevationDifference;
             public Quaternion originalSunRotation;
+            public bool cropped360;
+            public float cropBottomElevation, cropVerticalDegrees;
         }
 
         [Serializable]
@@ -121,8 +125,12 @@ namespace KinoRotunda.Editor
             bool ldr = ext == ".png" || ext == ".jpg" || ext == ".jpeg";
             var importer = (TextureImporter)AssetImporter.GetAtPath(original);
             importer.GetSourceTextureWidthAndHeight(out int width, out int height);
-            if (width < 512 || height < 256 || Math.Abs(width - height * 2) > 2)
+            if (width < 512 || height < 256 || (!options.cropped360 && Math.Abs(width - height * 2) > 2))
                 throw new ArgumentException($"Expected a full mono 360 x 180 degree panorama in 2:1 layout; got {width} x {height}. No scene changes made.");
+            float verticalDegrees = 360f * height / width;
+            if (options.cropped360 && (!options.manualSun || verticalDegrees >= 180 ||
+                options.cropBottomElevation < -90 || options.cropBottomElevation + verticalDegrees > 90))
+                throw new ArgumentException("A cropped 360 strip needs a picked sun and valid bottom elevation; its angular scale is derived from the original aspect ratio.");
             ConfigureImporter(importer, ldr, options, ldr);
             string texturePath = original;
             if (ldr)
@@ -144,6 +152,8 @@ namespace KinoRotunda.Editor
             {
                 sourcePath = original, texturePath = texturePath, convertedLdr = ldr,
                 sourceUrl = options.sourceUrl,
+                cropped360 = options.cropped360, cropBottomElevation = options.cropBottomElevation,
+                cropVerticalDegrees = verticalDegrees,
                 note = ldr ? "Converted sRGB to linear half-float EXR. Original LDR dynamic range is unchanged." : "Original HDR values preserved."
             };
             var panorama = AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath);
@@ -153,6 +163,8 @@ namespace KinoRotunda.Editor
                 sample = ReadLinear(panorama, 1024, 512);
                 var estimate = KinoPanoramaAnalysis.EstimateSun(sample);
                 result.sunUV = options.manualSun ? options.sunUV : estimate.uv;
+                if (options.cropped360)
+                    result.sunUV.y = .5f + (options.cropBottomElevation + options.sunUV.y * verticalDegrees) / 180f;
                 result.confidence = options.manualSun ? 1 : estimate.confidence;
                 result.aligned = options.alignSun && (options.manualSun || estimate.reliable);
             }
@@ -248,13 +260,21 @@ namespace KinoRotunda.Editor
             string folder = Path.GetDirectoryName(result.texturePath).Replace('\\', '/');
             // Each application has its own material, so the previous saved sky and Undo remain valid.
             result.materialPath = AssetDatabase.GenerateUniqueAssetPath(folder + "/Skybox.mat");
-            var shader = Shader.Find("Skybox/Panoramic");
+            var shader = Shader.Find(options.cropped360 ? "KINO/Cropped Panorama Skybox" : "Skybox/Panoramic");
             if (!shader) throw new InvalidOperationException("Unity's Skybox/Panoramic shader is unavailable.");
             var material = new Material(shader) { name = Path.GetFileName(folder) + " Sky" };
             material.SetTexture("_MainTex", AssetDatabase.LoadAssetAtPath<Texture2D>(result.texturePath));
-            material.SetFloat("_Mapping", 1);
-            material.SetFloat("_ImageType", 0);
-            material.SetFloat("_Layout", 0);
+            if (options.cropped360)
+            {
+                material.SetFloat("_BottomElevation", result.cropBottomElevation);
+                material.SetFloat("_VerticalDegrees", result.cropVerticalDegrees);
+            }
+            else
+            {
+                material.SetFloat("_Mapping", 1);
+                material.SetFloat("_ImageType", 0);
+                material.SetFloat("_Layout", 0);
+            }
             material.SetFloat("_Rotation", result.rotation);
             material.SetFloat("_Exposure", Mathf.Clamp(options.exposure, 0, 8));
             material.SetColor("_Tint", Color.gray);

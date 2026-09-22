@@ -1,0 +1,25 @@
+{
+    "sourcePath": "Assets/KinoRotunda/Textures/Panoramas/athens_panorama-26c7db75bbe5-76c1c5b9/Source.png",
+    "texturePath": "Assets/KinoRotunda/Textures/Panoramas/athens_panorama-26c7db75bbe5-76c1c5b9/Environment.exr",
+    "materialPath": "Assets/KinoRotunda/Textures/Panoramas/athens_panorama-26c7db75bbe5-76c1c5b9/Skybox.mat",
+    "sourceUrl": "User-supplied athens_panorama.png; stitched panorama, 2026-09-21",
+    "note": "Converted sRGB to linear half-float EXR. Original LDR dynamic range is unchanged.",
+    "convertedLdr": true,
+    "aligned": true,
+    "sunUV": {
+        "x": 0.5560302734375,
+        "y": 0.5336666703224182
+    },
+    "confidence": 1.0,
+    "rotation": 138.1708984375,
+    "sunElevationDifference": 4.76837158203125e-7,
+    "originalSunRotation": {
+        "x": 0.012787709012627602,
+        "y": 0.9689392447471619,
+        "z": -0.05128869786858559,
+        "w": 0.2415836900472641
+    },
+    "cropped360": true,
+    "cropBottomElevation": -30.458555221557618,
+    "cropVerticalDegrees": 93.6474609375
+}

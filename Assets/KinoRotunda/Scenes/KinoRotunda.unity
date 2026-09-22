@@ -26,7 +26,7 @@ RenderSettings:
   m_AmbientIntensity: 1
   m_AmbientMode: 0
   m_SubtractiveShadowColor: {r: 0.42, g: 0.478, b: 0.627, a: 1}
-  m_SkyboxMaterial: {fileID: 2100000, guid: 780799d7750b23e40a5f813c7470fdd9, type: 2}
+  m_SkyboxMaterial: {fileID: 2100000, guid: 905a5952ea86da34ea909839ee64cadd, type: 2}
   m_HaloStrength: 0.5
   m_FlareStrength: 1
   m_FlareFadeSpeed: 3
@@ -15721,7 +15721,7 @@ ReflectionProbe:
   m_RenderDynamicObjects: 0
   m_UseOcclusionCulling: 1
   m_Importance: 4
-  m_CustomBakedTexture: {fileID: 8900000, guid: 8a697ea31a7a79a43b330fc96c9ec7f8, type: 3}
+  m_CustomBakedTexture: {fileID: 8900000, guid: 14af5ed259a20ae4bb3d71f78cacef3a, type: 3}
 --- !u!1 &728400891
 GameObject:
   m_ObjectHideFlags: 0
@@ -28317,7 +28317,7 @@ ReflectionProbe:
   m_RenderDynamicObjects: 0
   m_UseOcclusionCulling: 1
   m_Importance: 1
-  m_CustomBakedTexture: {fileID: 8900000, guid: 3507bf74c83ed6441aeaba554dc2107a, type: 3}
+  m_CustomBakedTexture: {fileID: 8900000, guid: e1e08584f02b4924ea5a71a8dacc93b9, type: 3}
 --- !u!1 &1581545316
 GameObject:
   m_ObjectHideFlags: 0
@@ -39024,6 +39024,18 @@ PrefabInstance:
     - target: {fileID: 6522261079905387214, guid: 2cdf295e8f96ad04997d2ebf8a433cd5, type: 3}
       propertyPath: m_Enabled
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7560079395920620351, guid: 2cdf295e8f96ad04997d2ebf8a433cd5, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7560079395920620351, guid: 2cdf295e8f96ad04997d2ebf8a433cd5, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7560079395920620351, guid: 2cdf295e8f96ad04997d2ebf8a433cd5, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
       objectReference: {fileID: 0}
     - target: {fileID: 8360305904043679702, guid: 2cdf295e8f96ad04997d2ebf8a433cd5, type: 3}
       propertyPath: m_IsActive

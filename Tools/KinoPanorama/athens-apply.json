@@ -1,0 +1,18 @@
+{
+  "command": "apply",
+  "sourcePath": "C:/KINO2_VR_GAME/Artifacts/athens_panorama_20260921/athens_panorama.png",
+  "options": {
+    "alignSun": true,
+    "manualSun": true,
+    "sunUV": { "x": 0.5560302734375, "y": 0.3899577663068982 },
+    "cropped360": true,
+    "cropBottomElevation": -30.4585546875,
+    "rotationOffset": 0,
+    "exposure": 1,
+    "desktopSize": 8192,
+    "questSize": 4096,
+    "bakeLighting": true,
+    "updateReflections": true,
+    "sourceUrl": "User-supplied athens_panorama.png; stitched panorama, 2026-09-21"
+  }
+}
