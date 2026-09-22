@@ -88,8 +88,18 @@ namespace KinoVR.Editor
         }
 
         [MenuItem("Tools/KINO VR/Experience/3 - Test and capture sessions")]
-        public static void Run() => RunInternal(false);
-        public static void RunBatch() => RunInternal(true);
+        public static void Run() { SessionState.SetBool(Key + "Endings", false); RunInternal(false); }
+        public static void RunBatch() { SessionState.SetBool(Key + "Endings", false); RunInternal(true); }
+        [MenuItem("Tools/KINO VR/Experience/4 - Check ending transparency and hands")]
+        public static void RunEndingChecks()
+        {
+            Check(!EditorApplication.isPlayingOrWillChangePlaymode, "Exit Play before checking endings.");
+            for (int i = 0; i < EditorSceneManager.sceneCount; i++)
+                Check(!EditorSceneManager.GetSceneAt(i).isDirty, "Save open scenes before checking endings.");
+            KinoExperienceSetup.Apply();
+            SessionState.SetBool(Key + "Endings", true);
+            RunInternal(false);
+        }
         public static void RunDesktopInOpenEditor()
         {
             Check(!EditorApplication.isPlayingOrWillChangePlaymode, "Exit Play before running desktop experience tests.");
@@ -183,6 +193,7 @@ namespace KinoVR.Editor
                 Check(EditorApplication.timeSinceStartup < deadline, "Session test timed out.");
                 var flow = Object.FindFirstObjectByType<KinoExperienceController>();
                 if (!flow) return;
+                if (SessionState.GetBool(Key + "Endings", false)) { CheckEndings(flow); return; }
                 if (remountPending)
                 {
                     Check(EditorApplication.timeSinceStartup < inputDeadline, "Headset remount did not show mode selection.");
@@ -230,7 +241,7 @@ namespace KinoVR.Editor
             catch (Exception error)
             {
                 Directory.CreateDirectory(KinoExperienceSetup.Output);
-                File.WriteAllText(KinoExperienceSetup.Output + "/play-test.txt", "FAIL: " + error);
+                File.WriteAllText(KinoExperienceSetup.Output + (SessionState.GetBool(Key + "Endings", false) ? "/ending-checks.txt" : "/play-test.txt"), "FAIL: " + error);
                 Debug.LogException(error); End();
             }
         }
@@ -245,6 +256,126 @@ namespace KinoVR.Editor
             {
                 closingClock = flow.State.EnteredAt;
                 closingRealtime = Time.realtimeSinceStartupAsDouble;
+            }
+        }
+        static void CheckEndings(KinoExperienceController flow)
+        {
+            if (flow.Stage == KinoExperienceStage.Waiting) return;
+            if (!started)
+            {
+                started = true; captured.Clear();
+                Application.runInBackground = true;
+                Directory.CreateDirectory(KinoExperienceSetup.Output);
+                File.WriteAllText(KinoExperienceSetup.Output + "/ending-checks.txt", "RUNNING\n");
+                flow.writeLocalRecords = false;
+                flow.finaleSeconds = 4;
+                flow.BeginNormalSession();
+                double now = GetClock(flow);
+                for (int i = 0; i < 4; i++) flow.State.Advance(now, 0, 0, 0, 0, 0, 0, false);
+                flow.State.BeginSecondChance(now);
+                typeof(KinoExperienceController).GetMethod("FinishSessionRound", System.Reflection.BindingFlags.Instance |
+                    System.Reflection.BindingFlags.NonPublic).Invoke(flow, null);
+                return;
+            }
+            float elapsed = (float)(GetClock(flow) - flow.State.EnteredAt);
+            if (flow.Stage == KinoExperienceStage.Finale && elapsed > 1 && captured.Add("ending-score"))
+            {
+                Check(Mathf.Abs(flow.finaleBackgroundTransparency - 85) < .001f, "Score transparency is not 85% (15% black).");
+                VerifyEndingPixels(flow, .85f);
+                Capture(flow, "Ending-score-85");
+                flow.finaleBackgroundTransparency = 35;
+            }
+            else if (flow.Stage == KinoExperienceStage.Finale && captured.Contains("ending-score") && !captured.Contains("live-setting"))
+            {
+                // Wait for one runtime Update to apply a changed Inspector setting.
+                if (Mathf.Abs(flow.enclosure.BackgroundAlpha - .65f) > .001f) return;
+                VerifyEndingPixels(flow, .35f);
+                flow.finaleBackgroundTransparency = 85;
+                captured.Add("live-setting");
+            }
+            if (flow.Stage == KinoExperienceStage.Closing && elapsed > 1 && captured.Add("ending-closing"))
+            {
+                Check(Mathf.Abs(flow.closingBackgroundTransparency - 45) < .001f, "Removal transparency is not 45% (55% black).");
+                VerifyEndingPixels(flow, .45f);
+                Capture(flow, "Ending-remove-headset-45");
+            }
+            if (flow.Stage == KinoExperienceStage.Closing && elapsed >= 4.65f && captured.Add("closing-held"))
+            {
+                Check(Mathf.Abs(flow.enclosure.BackgroundAlpha - .55f) < .001f && flow.BlackoutAlpha == 0,
+                    "The removal instruction's 45% transparency was overridden by the closing fade.");
+                Capture(flow, "Ending-remove-headset-45-last-moment");
+            }
+            if (flow.Stage != KinoExperienceStage.ModeSelection) return;
+            Check(captured.Contains("ending-score") && captured.Contains("live-setting") && captured.Contains("ending-closing") && captured.Contains("closing-held"),
+                "Ending checks missed a stage or the live Inspector setting update.");
+            File.AppendAllText(KinoExperienceSetup.Output + "/ending-checks.txt",
+                "PASS: score 85% visible (15% black), removal 45% visible (55% black), live setting update, independent hand shading above the background, fade covers hands, stable removal transparency until reset.\n");
+            SessionState.SetBool(Key + "Passed", true); End();
+        }
+        static void VerifyEndingPixels(KinoExperienceController flow, float transmission)
+        {
+            var enclosure = flow.enclosure;
+            Check(Mathf.Abs(enclosure.BackgroundAlpha - (1 - transmission)) < .001f && enclosure.FadeAlpha == 0, "Wrong runtime background/fade alpha.");
+            var block = new MaterialPropertyBlock();
+            enclosure.BackgroundRenderer.GetPropertyBlock(block);
+            Check(Mathf.Abs(block.GetColor("_Color").a - (1 - transmission)) < .001f, "Wrong GPU background alpha.");
+            Check(flow.interfaceHandMaterial.shader.name == "KINO/Interface Hands", "Hands still use the room lighting shader.");
+            foreach (var catcher in flow.round.playerView.vrRig.GetComponentsInChildren<HandCatcher>(true))
+            {
+                var hand = catcher.GetComponentInParent<OVRHand>(true);
+                if (!hand) continue;
+                var renderer = hand.GetComponent<SkinnedMeshRenderer>();
+                Check(renderer.sharedMaterial.shader == flow.interfaceHandMaterial.shader && renderer.sortingOrder == 75,
+                    "Tracked hand is behind the sphere or has the wrong material.");
+            }
+            var go = new GameObject("Ending render probe", typeof(Camera));
+            var camera = go.GetComponent<Camera>(); camera.enabled = false;
+            camera.transform.position = new Vector3(0, 1.35f, 0);
+            camera.clearFlags = CameraClearFlags.SolidColor; camera.backgroundColor = Color.white;
+            camera.cullingMask = 1 << 31; camera.nearClipPlane = .05f; camera.farClipPlane = 20;
+            int bgLayer = enclosure.BackgroundRenderer.gameObject.layer, fadeLayer = enclosure.FadeRenderer.gameObject.layer;
+            var target = new RenderTexture(64, 64, 24, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+            var pixels = new Texture2D(64, 64, TextureFormat.RGBAFloat, false, true);
+            var oldTarget = RenderTexture.active;
+            GameObject proxy = null;
+            try
+            {
+                enclosure.BackgroundRenderer.gameObject.layer = enclosure.FadeRenderer.gameObject.layer = 31;
+                camera.targetTexture = target;
+                Color Sample()
+                {
+                    camera.Render(); RenderTexture.active = target;
+                    pixels.ReadPixels(new Rect(0, 0, 64, 64), 0, 0); pixels.Apply();
+                    return pixels.GetPixel(32, 32);
+                }
+                foreach (var angle in new[] { Vector3.zero, new Vector3(0,90,0), new Vector3(0,180,0), new Vector3(0,270,0), new Vector3(-90,0,0), new Vector3(90,0,0) })
+                {
+                    camera.transform.eulerAngles = angle;
+                    Color value = Sample();
+                    Check(Mathf.Abs(value.r - transmission) < .025f && value.a > .99f,
+                        "Sphere compositing mismatch at " + angle + ": " + value + ", expected " + transmission + " with opaque output alpha.");
+                }
+                camera.transform.rotation = Quaternion.identity;
+                proxy = GameObject.CreatePrimitive(PrimitiveType.Sphere); proxy.layer = 31;
+                proxy.name = "Hand material render probe";
+                proxy.transform.position = camera.transform.position + Vector3.forward;
+                proxy.transform.localScale = Vector3.one * .35f;
+                var handRenderer = proxy.GetComponent<Renderer>(); handRenderer.sharedMaterial = flow.interfaceHandMaterial;
+                handRenderer.sortingOrder = 75;
+                var handColour = Sample();
+                Check(handColour.g > .45f && handColour.b > .55f, "Instruction hands are dark without room lights: " + handColour);
+                enclosure.SetSessionFade(1);
+                var faded = Sample();
+                Check(faded.maxColorComponent <= 1 && faded.r < .005f && faded.g < .005f && faded.b < .005f, "Full fade does not cover the hands.");
+                File.AppendAllText(KinoExperienceSetup.Output + "/ending-checks.txt", transmission.ToString("P0") + " transmission: all six views + opaque output alpha + bright hand proxy PASS\n");
+            }
+            finally
+            {
+                enclosure.SetSessionFade(0);
+                enclosure.BackgroundRenderer.gameObject.layer = bgLayer; enclosure.FadeRenderer.gameObject.layer = fadeLayer;
+                RenderTexture.active = oldTarget;
+                if (proxy) Object.DestroyImmediate(proxy);
+                Object.DestroyImmediate(go); Object.DestroyImmediate(pixels); target.Release(); Object.DestroyImmediate(target);
             }
         }
 
@@ -553,6 +684,7 @@ namespace KinoVR.Editor
             if (hand) { Object.Destroy(hand); hand = null; }
             Time.timeScale = 1; Time.maximumDeltaTime = .3333333f;
             SessionState.SetBool(Key, false); EditorApplication.isPlaying = false;
+            SessionState.SetBool(Key + "Endings", false);
         }
     }
 }

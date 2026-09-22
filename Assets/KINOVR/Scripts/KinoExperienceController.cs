@@ -52,11 +52,12 @@ namespace KinoVR
         public TMP_Text title, body, footer;
         public RawImage allwynLogo, kinoLogo;
         public KinoBlackEnclosure enclosure;
+        public Material interfaceHandMaterial;
         public float BlackoutAlpha => enclosure ? enclosure.FadeAlpha : 0;
         [Header("Ending background transparency (%)")]
         [Tooltip("0 = solid black, 100 = fully transparent. Text stays opaque.")]
-        [Range(0, 100)] public float finaleBackgroundTransparency = 15;
-        [Range(0, 100)] public float closingBackgroundTransparency = 55;
+        [Range(0, 100)] public float finaleBackgroundTransparency = 85;
+        [Range(0, 100)] public float closingBackgroundTransparency = 45;
         [Header("VR layout (metres)")]
         [Range(1.2f, 3)] public float contentDistance = 2.5f;
         [Range(1.2f, 3)] public float contentWidth = 2.2f;
@@ -82,7 +83,7 @@ namespace KinoVR
             if (!round) { enabled = false; return; }
             round.experience = this;
             if (round.playerView && round.playerView.vrRig) trackedRig = round.playerView.vrRig.GetComponent<OVRCameraRig>();
-            modeHands = new KinoModeHands(round.playerView && round.playerView.vrRig ? round.playerView.vrRig.transform : null);
+            modeHands = new KinoModeHands(round.playerView && round.playerView.vrRig ? round.playerView.vrRig.transform : null, interfaceHandMaterial);
             round.startAutomatically = false;
             round.showcaseBoostAfterSecondChance = false;
             round.onRoundFinished.AddListener(FinishSessionRound);
@@ -207,9 +208,7 @@ namespace KinoVR
             bool overlay = Stage == KinoExperienceStage.ModeSelection || Stage == KinoExperienceStage.Safety || Stage == KinoExperienceStage.Branding ||
                 Stage == KinoExperienceStage.Introduction || Stage == KinoExperienceStage.Finale || Stage == KinoExperienceStage.Closing;
             content.alpha = overlay ? 1 : 0;
-            modeHands?.SetVisible(Stage == KinoExperienceStage.ModeSelection);
-            if (enclosure) enclosure.SetBackground(Stage == KinoExperienceStage.Finale ? 1 - finaleBackgroundTransparency / 100 :
-                Stage == KinoExperienceStage.Closing ? 1 - closingBackgroundTransparency / 100 : overlay ? 1 : 0);
+            ApplyBackground();
             PositionContent();
             if (modeCanvas)
             {
@@ -264,6 +263,7 @@ namespace KinoVR
         }
         void AnimateStage()
         {
+            ApplyBackground();
             float elapsed = (float)(clock - State.EnteredAt);
             if (Stage == KinoExperienceStage.Safety) SetBlackout(1 - Mathf.SmoothStep(0, 1, elapsed / .8f));
             else if (Stage != KinoExperienceStage.Startup && Stage != KinoExperienceStage.Complete) SetBlackout(0);
@@ -271,6 +271,8 @@ namespace KinoVR
                 footer.text = requireExternalSafetyConfirmation && !State.ExternalConfirmation ? "Περιμένουμε επιβεβαίωση από το προσωπικό." : "Η εμπειρία ξεκινά σε λίγο.";
             if (Stage == KinoExperienceStage.Branding)
                 AnimateBranding(elapsed);
+            if (Stage == KinoExperienceStage.ModeSelection)
+                SetBlackout(1 - Mathf.SmoothStep(0, 1, elapsed / .4f));
             if (Stage == KinoExperienceStage.Gameplay)
                 SetBlackout(1 - Mathf.SmoothStep(0, 1, elapsed / .8f));
             if (Stage == KinoExperienceStage.Introduction)
@@ -292,8 +294,19 @@ namespace KinoVR
             if (Stage == KinoExperienceStage.Closing)
             {
                 float fade = Mathf.SmoothStep(0, 1, (elapsed - closingSeconds + .5f) / .5f);
-                SetBlackout(fade); SetAudio(1 - fade);
+                // Hold the requested transparency for the whole removal instruction.
+                // Full black belongs to Complete, after the five-second message.
+                SetAudio(1 - fade);
             }
+        }
+        void ApplyBackground()
+        {
+            if (!enclosure) return;
+            bool instructions = Stage == KinoExperienceStage.ModeSelection || Stage == KinoExperienceStage.Safety ||
+                Stage == KinoExperienceStage.Branding || Stage == KinoExperienceStage.Introduction;
+            float alpha = Stage == KinoExperienceStage.Finale ? 1 - Mathf.Clamp01(finaleBackgroundTransparency / 100) :
+                Stage == KinoExperienceStage.Closing ? 1 - Mathf.Clamp01(closingBackgroundTransparency / 100) : instructions ? 1 : 0;
+            enclosure.SetBackground(alpha);
         }
         void PositionContent()
         {
@@ -342,6 +355,7 @@ namespace KinoVR
                     device.TryGetFeatureValue(CommonUsages.isTracked, out bool tracked) && tracked)
                     ShowModeSelection();
             }
+            modeHands?.SetVisible(enclosure && enclosure.BackgroundAlpha > 0 && mounted);
         }
         void SetBlackout(float alpha)
         {

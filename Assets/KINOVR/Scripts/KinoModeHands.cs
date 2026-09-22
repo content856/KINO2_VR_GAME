@@ -4,8 +4,8 @@ using UnityEngine;
 
 namespace KinoVR
 {
-    // Only the two catching hands render over the menu background. Gameplay and
-    // other interstitials keep their original rendering, tracking and visibility.
+    // The two catching hands stay legible over every instruction background.
+    // Gameplay keeps its original materials; the SDK still owns tracking visibility.
     internal sealed class KinoModeHands : IDisposable
     {
         sealed class Hand
@@ -18,10 +18,12 @@ namespace KinoVR
         }
 
         readonly List<Hand> hands = new List<Hand>(2);
+        readonly Material interfaceMaterial;
         bool disposed;
 
-        public KinoModeHands(Transform vrRig)
+        public KinoModeHands(Transform vrRig, Material material)
         {
+            interfaceMaterial = material;
             if (!vrRig) return;
             var seen = new HashSet<SkinnedMeshRenderer>();
             foreach (var catcher in vrRig.GetComponentsInChildren<HandCatcher>(true))
@@ -43,13 +45,15 @@ namespace KinoVR
             {
                 if (!hand.renderer) continue;
                 if (!visible) { Restore(hand); continue; }
+                if (!interfaceMaterial) continue;
+                if (hand.applied && hand.renderer.sharedMaterial == hand.menu) continue;
                 // Permit the SDK to supply a material after this helper is constructed.
                 if (!hand.original) hand.original = hand.renderer.sharedMaterial;
                 if (!hand.original) continue;
                 if (!hand.menu)
-                    hand.menu = new Material(hand.original)
+                    hand.menu = new Material(interfaceMaterial)
                     {
-                        name = hand.original.name + " (mode selection)",
+                        name = "KINO instruction hand",
                         hideFlags = HideFlags.DontSave,
                         renderQueue = 3000
                     };
