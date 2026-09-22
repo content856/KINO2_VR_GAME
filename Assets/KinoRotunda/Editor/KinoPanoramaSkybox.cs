@@ -427,6 +427,7 @@ namespace KinoRotunda.Editor
                     case "open": KinoPanoramaWindow.Open(); WriteStatus("360 Skybox window ready."); break;
                     case "apply": ApplyFile(request.sourcePath, request.options); break;
                     case "test": KinoPanoramaTests.Run(); break;
+                    case "quality": KinoPanoramaQuality.ImproveCurrent(); break;
                     default: throw new ArgumentException("Unknown panorama command: " + request.command);
                 }
             }

@@ -14,6 +14,8 @@ Open **Tools > KINO Rotunda > 360 Skybox** in the KinoRotunda scene. Drop a loca
 
 Keep only the KinoRotunda scene loaded, exit Play Mode, and let existing lighting bakes finish before applying. Turning off lighting/reflection options gives a quick background-only preview; the existing baked illumination then remains from the previous sky.
 
+For the Athens cropped LDR sky, **Tools > KINO Rotunda > Use full-resolution LDR sky (8K)** restores the source photograph's full detail, including in Android editor mode. It samples the original sRGB PNG/JPG directly, using 8K ASTC 4x4 on Android and BC7 on desktop. This avoids enlarging a downsampled 4K EXR, keeps mipmaps, and preserves the current material rotation/exposure and scene sun. At the Athens aspect ratio, 8K ASTC 4x4 costs approximately 22 MiB including mipmaps on-device, similar to the former 4K RGB9E5 texture. Editor fallback memory can differ. Comparisons and original material/import settings are saved under `Artifacts/KinoRotunda/Panorama/Quality-*`. Reapplying through the standard importer creates a new EXR sky; run this detail option again for the new LDR sky. The automation command is `{"command":"quality"}` in `Temp/KinoPanorama.request`.
+
 ## Selected Athens panorama
 
 [Sunset over Syntagma Square drone aerial view, Athens, Greece — FOTO360](https://www.360cities.net/image/sunset-over-syntagma-square-drone-aerial-view-athens-greece), advertised resolution 17,966 × 8,983.
