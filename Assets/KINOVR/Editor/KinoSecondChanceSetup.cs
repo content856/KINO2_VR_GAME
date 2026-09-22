@@ -106,6 +106,7 @@ namespace KinoVR.Editor
             if (round.secondChancePresentation)
             {
                 foreach (var label in board.multiplierLabels) if (label) label.fontSharedMaterial = popupMaterial;
+                KinoExperienceSetup.ConfigureSecondChanceScreen(round.secondChancePresentation);
                 return;
             }
             var presentation = round.gameObject.AddComponent<KinoSecondChancePresentation>();
@@ -136,20 +137,7 @@ namespace KinoVR.Editor
                 label.gameObject.SetActive(false);
                 board.multiplierLabels[i] = label;
             }
-            const string fadePath = "Assets/KINOVR/Materials/ViewFade.mat";
-            var fadeMaterial = AssetDatabase.LoadAssetAtPath<Material>(fadePath);
-            if (!fadeMaterial)
-            {
-                fadeMaterial = new Material(Shader.Find("KINO/View Fade")) { name = "ViewFade" };
-                AssetDatabase.CreateAsset(fadeMaterial, fadePath);
-            }
-            var canvas = CanvasAt("View blackout", round.transform, new Vector2(2, 2));
-            canvas.sortingOrder = 32760;
-            var fade = Graphic("Blackout", canvas.transform, 0, 0, 2, 2, fadeMaterial);
-            fade.rectTransform.anchorMin = Vector2.zero; fade.rectTransform.anchorMax = Vector2.one;
-            fade.rectTransform.offsetMin = fade.rectTransform.offsetMax = Vector2.zero;
-            presentation.viewFade = canvas;
-            presentation.fadeImage = fade;
+            KinoExperienceSetup.ConfigureSecondChanceScreen(presentation);
             presentation.ResetPresentation();
             EditorUtility.SetDirty(round);
         }

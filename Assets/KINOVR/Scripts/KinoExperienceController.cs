@@ -33,7 +33,8 @@ namespace KinoVR
         public float BrandingDuration => 2 * brandingSeconds + logoBlackSeconds;
         [Min(1)] public float introductionSeconds = 6;
         [Min(1)] public float finaleSeconds = 10;
-        [Min(2)] public float closingSeconds = 6;
+        [Tooltip("Time from showing the removal instruction until the next visitor's mode selection.")]
+        [Min(2)] public float closingSeconds = 5;
         [Header("Replace this draft before production")]
         public string safetyVersion = "placeholder-v1";
         public bool placeholderSafety = true;
@@ -48,11 +49,14 @@ namespace KinoVR
         [Header("Presentation")]
         public Canvas contentCanvas;
         public CanvasGroup content;
-        public Image backdrop;
         public TMP_Text title, body, footer;
         public RawImage allwynLogo, kinoLogo;
-        public Canvas blackoutCanvas;
-        public Image blackout;
+        public KinoBlackEnclosure enclosure;
+        public float BlackoutAlpha => enclosure ? enclosure.FadeAlpha : 0;
+        [Header("Ending background transparency (%)")]
+        [Tooltip("0 = solid black, 100 = fully transparent. Text stays opaque.")]
+        [Range(0, 100)] public float finaleBackgroundTransparency = 15;
+        [Range(0, 100)] public float closingBackgroundTransparency = 55;
         [Header("VR layout (metres)")]
         [Range(1.2f, 3)] public float contentDistance = 2.5f;
         [Range(1.2f, 3)] public float contentWidth = 2.2f;
@@ -66,6 +70,7 @@ namespace KinoVR
         public string LastStorageError { get; private set; }
         bool initialized, mounted, awaitingTrackedView;
         OVRCameraRig trackedRig;
+        KinoModeHands modeHands;
         int lastAnchorFrame = -1;
         float audioMix = 1;
         double clock;
@@ -77,6 +82,7 @@ namespace KinoVR
             if (!round) { enabled = false; return; }
             round.experience = this;
             if (round.playerView && round.playerView.vrRig) trackedRig = round.playerView.vrRig.GetComponent<OVRCameraRig>();
+            modeHands = new KinoModeHands(round.playerView && round.playerView.vrRig ? round.playerView.vrRig.transform : null);
             round.startAutomatically = false;
             round.showcaseBoostAfterSecondChance = false;
             round.onRoundFinished.AddListener(FinishSessionRound);
@@ -107,11 +113,13 @@ namespace KinoVR
             mounted = false;
             awaitingTrackedView = false;
             if (!initialized) return;
-            if (Record != null && Stage != KinoExperienceStage.Complete && Stage != KinoExperienceStage.ModeSelection) { Record.abortedUtc = Utc; SaveRecord(); }
+            if (Record != null && string.IsNullOrEmpty(Record.completedUtc) && Stage != KinoExperienceStage.ModeSelection) { Record.abortedUtc = Utc; SaveRecord(); }
             StopRound();
             State.Reset(clock);
             if (content) content.alpha = 0;
             if (modeCanvas) modeCanvas.gameObject.SetActive(false);
+            modeHands?.SetVisible(false);
+            if (enclosure) enclosure.SetBackground(0);
             SetBlackout(1);
             SetAudio(0);
         }
@@ -123,6 +131,8 @@ namespace KinoVR
             awaitingTrackedView = false;
             StopRound();
             round.showcaseBoostAfterSecondChance = false;
+            if (round.score) round.score.ResetScore();
+            if (round.board) round.board.ResetBoard();
             State.SelectMode(clock);
             PresentStage();
         }
@@ -163,6 +173,9 @@ namespace KinoVR
             }
             // No fast-forward after app suspension; each screen remains observable.
             clock += Math.Min(Time.unscaledDeltaTime, .1f);
+            // Complete is observable for one frame so receipts and completion events finish
+            // exactly once. A new visitor can then choose a mode without a headset cycle.
+            if (Stage == KinoExperienceStage.Complete) { ShowModeSelection(); return; }
             if (Stage == KinoExperienceStage.Gameplay && round.State.Phase >= KinoRoundPhase.BoardHold &&
                 round.State.Phase <= KinoRoundPhase.SecondChance && State.BeginSecondChance(clock)) PresentStage();
             if (Stage == KinoExperienceStage.SecondChance && (round.State.Phase == KinoRoundPhase.Boost ||
@@ -194,6 +207,9 @@ namespace KinoVR
             bool overlay = Stage == KinoExperienceStage.ModeSelection || Stage == KinoExperienceStage.Safety || Stage == KinoExperienceStage.Branding ||
                 Stage == KinoExperienceStage.Introduction || Stage == KinoExperienceStage.Finale || Stage == KinoExperienceStage.Closing;
             content.alpha = overlay ? 1 : 0;
+            modeHands?.SetVisible(Stage == KinoExperienceStage.ModeSelection);
+            if (enclosure) enclosure.SetBackground(Stage == KinoExperienceStage.Finale ? 1 - finaleBackgroundTransparency / 100 :
+                Stage == KinoExperienceStage.Closing ? 1 - closingBackgroundTransparency / 100 : overlay ? 1 : 0);
             PositionContent();
             if (modeCanvas)
             {
@@ -204,10 +220,6 @@ namespace KinoVR
             allwynLogo.gameObject.SetActive(false);
             kinoLogo.gameObject.SetActive(Stage == KinoExperienceStage.Finale);
             allwynLogo.color = kinoLogo.color = Color.white;
-            backdrop.color = Stage == KinoExperienceStage.Branding ? Color.black : new Color(.008f, .026f, .055f, .97f);
-            backdrop.gameObject.SetActive(true);
-            if (Stage == KinoExperienceStage.Introduction || Stage == KinoExperienceStage.Finale)
-                backdrop.color = new Color(.008f, .026f, .055f, .88f);
             title.color = Color.white;
             body.color = Color.white;
             allwynLogo.rectTransform.anchoredPosition = Vector2.zero;
@@ -259,11 +271,15 @@ namespace KinoVR
                 footer.text = requireExternalSafetyConfirmation && !State.ExternalConfirmation ? "Περιμένουμε επιβεβαίωση από το προσωπικό." : "Η εμπειρία ξεκινά σε λίγο.";
             if (Stage == KinoExperienceStage.Branding)
                 AnimateBranding(elapsed);
+            if (Stage == KinoExperienceStage.Gameplay)
+                SetBlackout(1 - Mathf.SmoothStep(0, 1, elapsed / .8f));
             if (Stage == KinoExperienceStage.Introduction)
             {
                 SetBlackout(1 - Mathf.SmoothStep(0, 1, elapsed / 1.2f));
                 content.alpha = Mathf.Min(Mathf.Clamp01(elapsed / .8f), Mathf.Clamp01((introductionSeconds - elapsed) / .8f));
-                backdrop.color = new Color(.008f, .026f, .055f, Mathf.Lerp(.9f, .65f, Mathf.Clamp01(elapsed / introductionSeconds)));
+                // Reading stays on an opaque 360-degree background. The last fade
+                // conceals the switch to the room before the first gameplay ball.
+                SetBlackout(Mathf.Max(BlackoutAlpha, Mathf.SmoothStep(0, 1, (elapsed - introductionSeconds + .5f) / .5f)));
                 SetAudio(Mathf.SmoothStep(0, 1, elapsed / 2));
             }
             if (Stage == KinoExperienceStage.Finale)
@@ -275,7 +291,7 @@ namespace KinoVR
             else kinoLogo.transform.localScale = Vector3.one;
             if (Stage == KinoExperienceStage.Closing)
             {
-                float fade = Mathf.SmoothStep(0, 1, (elapsed - closingSeconds + 2) / 2);
+                float fade = Mathf.SmoothStep(0, 1, (elapsed - closingSeconds + .5f) / .5f);
                 SetBlackout(fade); SetAudio(1 - fade);
             }
         }
@@ -326,23 +342,10 @@ namespace KinoVR
                     device.TryGetFeatureValue(CommonUsages.isTracked, out bool tracked) && tracked)
                     ShowModeSelection();
             }
-            if (blackoutCanvas && blackoutCanvas.gameObject.activeSelf) FollowBlackout();
         }
         void SetBlackout(float alpha)
         {
-            if (!blackout) return;
-            blackout.color = new Color(0, 0, 0, alpha);
-            blackoutCanvas.gameObject.SetActive(alpha > 0);
-            FollowBlackout();
-        }
-        void FollowBlackout()
-        {
-            var view = round && round.playerView ? round.playerView.View : null;
-            if (!view) return;
-            var camera = view.GetComponent<Camera>();
-            float distance = camera ? camera.nearClipPlane + .025f : .2f;
-            blackoutCanvas.transform.SetPositionAndRotation(view.position + view.forward * distance, view.rotation);
-            blackoutCanvas.transform.localScale = Vector3.one * Mathf.Max(2, distance * 10);
+            if (enclosure) enclosure.SetSessionFade(alpha);
         }
         void SetAudio(float mix)
         {
@@ -375,13 +378,15 @@ namespace KinoVR
         {
             OVRManager.HMDMounted -= Mounted; OVRManager.HMDUnmounted -= Unmounted;
             if (trackedRig) trackedRig.UpdatedAnchors -= AnchorsUpdated;
-            if (Record != null && Stage != KinoExperienceStage.Complete && Stage != KinoExperienceStage.Waiting && Stage != KinoExperienceStage.ModeSelection)
+            if (Record != null && string.IsNullOrEmpty(Record.completedUtc) && Stage != KinoExperienceStage.Waiting && Stage != KinoExperienceStage.ModeSelection)
             { Record.abortedUtc = Utc; SaveRecord(); }
             StopRound(); SetAudio(1);
+            modeHands?.SetVisible(false);
             if (content) content.alpha = 0;
             if (modeCanvas) modeCanvas.gameObject.SetActive(false);
+            if (enclosure) enclosure.SetBackground(0);
             SetBlackout(0);
         }
-        void OnDestroy() { if (round) round.onRoundFinished.RemoveListener(FinishSessionRound); }
+        void OnDestroy() { modeHands?.Dispose(); if (round) round.onRoundFinished.RemoveListener(FinishSessionRound); }
     }
 }

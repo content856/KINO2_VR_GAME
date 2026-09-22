@@ -32,7 +32,7 @@ Material:
     m_Floats:
     - _BottomElevation: -30.458555
     - _Exposure: 2
-    - _Rotation: 144
+    - _Rotation: 146
     - _VerticalDegrees: 93.64746
     m_Colors:
     - _Nadir: {r: 0.17999998, g: 0.16999996, b: 0.13999996, a: 1}

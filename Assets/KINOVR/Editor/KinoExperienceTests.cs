@@ -16,10 +16,11 @@ namespace KinoVR.Editor
     public static class KinoExperienceTests
     {
         const string Key = "KINO.ExperienceTest";
-        static double deadline, inputDeadline;
-        static bool started, inputSent, handMoved, remountPending;
-        static int run, results, closed;
-        static string currentSession, completedSession;
+        static double deadline, inputDeadline, closingClock, closingRealtime, menuReturnedAt;
+        static bool started, inputSent, handMoved, remountPending, completionPending, completionVerified;
+        static float completedBlackout, completedAudio;
+        static int run, results, closed, completedLiveScore;
+        static string currentSession, completedSession, completedRecord;
         static GameObject hand;
         static float handCreatedAt;
         static readonly List<KinoExperienceStage> visited = new List<KinoExperienceStage>();
@@ -34,11 +35,11 @@ namespace KinoVR.Editor
             {
                 if (change == PlayModeStateChange.EnteredPlayMode && SessionState.GetBool(Key, false))
                 { started = false; deadline = EditorApplication.timeSinceStartup + 240; }
-                if (change == PlayModeStateChange.EnteredEditMode && SessionState.GetBool(Key + "Exit", false))
+                if (change == PlayModeStateChange.EnteredEditMode)
                 {
+                    RestoreEditorXR();
+                    if (!SessionState.GetBool(Key + "Exit", false)) return;
                     SessionState.SetBool(Key + "Exit", false);
-                    var xr = XRGeneralSettingsPerBuildTarget.XRGeneralSettingsForBuildTarget(BuildTargetGroup.Standalone);
-                    if (xr) xr.InitManagerOnStart = SessionState.GetBool(Key + "XRInit", true);
                     EditorApplication.Exit(SessionState.GetBool(Key + "Passed", false) ? 0 : 1);
                 }
             };
@@ -89,22 +90,53 @@ namespace KinoVR.Editor
         [MenuItem("Tools/KINO VR/Experience/3 - Test and capture sessions")]
         public static void Run() => RunInternal(false);
         public static void RunBatch() => RunInternal(true);
+        public static void RunDesktopInOpenEditor()
+        {
+            Check(!EditorApplication.isPlayingOrWillChangePlaymode, "Exit Play before running desktop experience tests.");
+            for (int i = 0; i < EditorSceneManager.sceneCount; i++)
+                Check(!EditorSceneManager.GetSceneAt(i).isDirty, "Save open scenes before running desktop experience tests.");
+            RunInternal(false);
+        }
+
         static void RunInternal(bool exit)
         {
             KinoExperienceSetup.Validate();
             EditorSceneManager.OpenScene("Assets/KinoRotunda/Scenes/KinoRotunda.unity");
             SessionState.SetBool(Key, true); SessionState.SetBool(Key + "Exit", exit); SessionState.SetBool(Key + "Passed", false);
-            if (Application.isBatchMode)
-            {
-                var xr = XRGeneralSettingsPerBuildTarget.XRGeneralSettingsForBuildTarget(BuildTargetGroup.Standalone);
-                if (xr) { SessionState.SetBool(Key + "XRInit", xr.InitManagerOnStart); xr.InitManagerOnStart = false; }
-            }
+            DisableEditorXR();
             EditorApplication.isPlaying = true;
+        }
+
+        static void DisableEditorXR()
+        {
+            var activeGroup = BuildPipeline.GetBuildTargetGroup(EditorUserBuildSettings.activeBuildTarget);
+            SessionState.SetInt(Key + "XRActiveGroup", (int)activeGroup);
+            foreach (var group in new[] { BuildTargetGroup.Standalone, activeGroup }.Distinct())
+            {
+                var xr = XRGeneralSettingsPerBuildTarget.XRGeneralSettingsForBuildTarget(group);
+                if (!xr) continue;
+                SessionState.SetBool(Key + "XRInit" + (int)group, xr.InitManagerOnStart);
+                xr.InitManagerOnStart = false;
+            }
+            SessionState.SetBool(Key + "XRRestore", true);
+        }
+
+        static void RestoreEditorXR()
+        {
+            if (!SessionState.GetBool(Key + "XRRestore", false)) return;
+            var activeGroup = (BuildTargetGroup)SessionState.GetInt(Key + "XRActiveGroup", (int)BuildTargetGroup.Standalone);
+            foreach (var group in new[] { BuildTargetGroup.Standalone, activeGroup }.Distinct())
+            {
+                var xr = XRGeneralSettingsPerBuildTarget.XRGeneralSettingsForBuildTarget(group);
+                if (xr) xr.InitManagerOnStart = SessionState.GetBool(Key + "XRInit" + (int)group, true);
+            }
+            SessionState.SetBool(Key + "XRRestore", false);
         }
 
         static void PrepareRun(int index)
         {
             run = index; inputSent = handMoved = false; currentSession = null;
+            completionPending = completionVerified = false; closingClock = closingRealtime = menuReturnedAt = -1;
             visited.Clear(); phases.Clear(); captured.Clear(); previous = KinoExperienceStage.Waiting;
             inputDeadline = EditorApplication.timeSinceStartup + 10;
         }
@@ -116,7 +148,8 @@ namespace KinoVR.Editor
             flow.writeLocalRecords = false;
             flow.startupSeconds = 1; flow.safetySeconds = 2;
             flow.brandingSeconds = 1.6f; flow.logoBlackSeconds = .7f; flow.logoFadeSeconds = .35f;
-            flow.introductionSeconds = 2; flow.finaleSeconds = 2; flow.closingSeconds = 2.5f;
+            flow.introductionSeconds = 2; flow.finaleSeconds = 2;
+            Check(Mathf.Abs(flow.closingSeconds - 5) < .001f, "Closing instruction must retain its five real-second duration.");
             flow.round.showcaseBoostDuration = 4; flow.round.showcaseBoostInterval = .5f;
             flow.onResultReady.AddListener(json =>
             {
@@ -126,7 +159,17 @@ namespace KinoVR.Editor
                 Check(record.score == flow.round.State.Score && record.boostCatches == flow.round.State.BoostCatchCount,
                     "Result event did not include the final Boost score.");
             });
-            flow.onSessionClosed.AddListener(() => closed++);
+            flow.onSessionClosed.AddListener(() =>
+            {
+                closed++;
+                completedBlackout = flow.BlackoutAlpha;
+                completedAudio = flow.round.audioController.sessionVolume;
+                completedLiveScore = flow.round.score.CurrentScore;
+                completedRecord = JsonUtility.ToJson(flow.Record);
+                // Complete is a one-frame handoff; observe it at its event even if an Editor tick misses that frame.
+                ObserveStage(flow);
+                completionPending = true;
+            });
             Application.runInBackground = true;
             Time.timeScale = 6; Time.maximumDeltaTime = .1f;
             PrepareRun(0);
@@ -150,12 +193,8 @@ namespace KinoVR.Editor
                 }
                 if (flow.Stage == KinoExperienceStage.Waiting) return;
                 if (!started) Initialize(flow);
-                if (flow.Stage != previous)
-                {
-                    previous = flow.Stage; visited.Add(previous);
-                    Debug.Log("[Experience test] " + (run == 0 ? "Normal: " : "Boost: ") + previous);
-                    ValidateWorldCanvas(flow);
-                }
+                if (completionPending) { VerifyAutomaticReturn(flow); return; }
+                ObserveStage(flow);
                 if (flow.Stage < KinoExperienceStage.Gameplay || flow.Stage >= KinoExperienceStage.Finale)
                     Check(!flow.round.IsRunning && flow.round.launcher.ActiveBallCount == 0, "Balls outside gameplay.");
                 Check(!flow.round.restartButton.IsVisible, "Player restart visible in guided session.");
@@ -176,6 +215,10 @@ namespace KinoVR.Editor
                     if (ball.gameObject.activeInHierarchy && flow.round.IsRunning && catchable) catchable.Catch();
                 }
                 float elapsed = (float)(GetClock(flow) - flow.State.EnteredAt);
+                if (flow.Stage == KinoExperienceStage.Safety && elapsed > 1 && !captured.Contains("Enclosure-360"))
+                {
+                    ValidateEnclosureViews(flow); captured.Add("Enclosure-360");
+                }
                 if (flow.Stage == KinoExperienceStage.Branding) ValidateBranding(flow, elapsed);
                 else
                 {
@@ -183,16 +226,6 @@ namespace KinoVR.Editor
                     if (flow.Stage == KinoExperienceStage.SecondChance) capture += "-" + flow.round.State.Phase;
                     if (elapsed > .35f && flow.Stage != KinoExperienceStage.Complete) CaptureOnce(flow, capture);
                 }
-                if (flow.Stage != KinoExperienceStage.Complete) return;
-                VerifyCompletedSession(flow);
-                if (run == 0)
-                {
-                    completedSession = currentSession;
-                    PrepareRun(1); flow.ShowModeSelection();
-                    Check(flow.Stage == KinoExperienceStage.ModeSelection && !flow.round.IsRunning, "Cannot return to the mode menu.");
-                    return;
-                }
-                VerifyRemount(flow);
             }
             catch (Exception error)
             {
@@ -200,6 +233,51 @@ namespace KinoVR.Editor
                 File.WriteAllText(KinoExperienceSetup.Output + "/play-test.txt", "FAIL: " + error);
                 Debug.LogException(error); End();
             }
+        }
+
+        static void ObserveStage(KinoExperienceController flow)
+        {
+            if (flow.Stage == previous) return;
+            previous = flow.Stage; visited.Add(previous);
+            Debug.Log("[Experience test] " + (run == 0 ? "Normal: " : "Boost: ") + previous);
+            ValidateWorldCanvas(flow);
+            if (flow.Stage == KinoExperienceStage.Closing)
+            {
+                closingClock = flow.State.EnteredAt;
+                closingRealtime = Time.realtimeSinceStartupAsDouble;
+            }
+        }
+
+        static void VerifyAutomaticReturn(KinoExperienceController flow)
+        {
+            if (!completionVerified)
+            {
+                Check(closingClock >= 0 && flow.State.EnteredAt - closingClock >= 5 - .001,
+                    "Closing instruction was not shown for five unscaled seconds.");
+                Check(Time.realtimeSinceStartupAsDouble - closingRealtime >= 4.8,
+                    "Closing instruction was accelerated by gameplay timeScale.");
+                VerifyCompletedSession(flow); completionVerified = true;
+                completedSession = currentSession; inputDeadline = EditorApplication.timeSinceStartup + 3;
+            }
+            Check(EditorApplication.timeSinceStartup < inputDeadline, "Completed session did not return automatically to mode selection.");
+            Check(results == run + 1 && closed == run + 1 && JsonUtility.ToJson(flow.Record) == completedRecord,
+                "Automatic menu return repeated an event or changed the completed record.");
+            if (flow.Stage == KinoExperienceStage.Complete) return;
+            Check(flow.Stage == KinoExperienceStage.ModeSelection && !flow.round.IsRunning && flow.round.launcher.ActiveBallCount == 0,
+                "Automatic return did not stop at the initial mode menu.");
+            Check(flow.normalModeButton.gameObject.activeInHierarchy && flow.boostModeButton.gameObject.activeInHierarchy,
+                "Automatic return is missing Normal or Boost.");
+            if (menuReturnedAt < 0)
+            {
+                menuReturnedAt = Time.realtimeSinceStartupAsDouble;
+                ValidateWorldCanvas(flow); Capture(flow, (run == 0 ? "Normal-" : "Boost-") + "Automatic-menu-return");
+            }
+            // Observe an idle menu after arming: it must not start another session or emit more events.
+            if (Time.realtimeSinceStartupAsDouble - menuReturnedAt < .7) return;
+            Check(flow.Record.sessionId == currentSession && !flow.State.IncludeBoost && !flow.round.showcaseBoostAfterSecondChance,
+                "Automatic menu return retained an active mode or created another session.");
+            if (run == 0) PrepareRun(1);
+            else VerifyRemount(flow);
         }
 
         static void SelectMode(KinoExperienceController flow)
@@ -249,7 +327,7 @@ namespace KinoVR.Editor
 
         static void ValidateWorldCanvas(KinoExperienceController flow)
         {
-            Check(flow.contentCanvas.renderMode == RenderMode.WorldSpace && flow.blackoutCanvas.renderMode == RenderMode.WorldSpace,
+            Check(flow.contentCanvas.renderMode == RenderMode.WorldSpace,
                 "Experience uses a non-VR canvas.");
             var view = flow.round.playerView.View;
             var heading = Quaternion.LookRotation(Vector3.ProjectOnPlane(view.forward, Vector3.up).normalized);
@@ -259,10 +337,108 @@ namespace KinoVR.Editor
             var scale = flow.contentCanvas.transform.lossyScale;
             Check(Mathf.Abs(rect.width * scale.x - 2.2f) < .025f && Mathf.Abs(rect.height * scale.y - 1.4f) < .025f,
                 "Experience canvas changed its physical size.");
+            Check(flow.enclosure && flow.enclosure.BackgroundRenderer && flow.enclosure.FadeRenderer,
+                "Experience is missing its 360-degree black enclosure.");
+            Check(!flow.enclosure.BackgroundRenderer.transform.IsChildOf(view) && !flow.enclosure.FadeRenderer.transform.IsChildOf(view),
+                "Black enclosure follows the player's head instead of the room.");
         }
 
         static float VisibleAlpha(RawImage logo, CanvasGroup group) =>
             logo.gameObject.activeInHierarchy ? logo.color.a * group.alpha : 0;
+
+        static void ValidateEnclosureViews(KinoExperienceController flow)
+        {
+            Check(flow.enclosure.BackgroundAlpha > .99f && flow.BlackoutAlpha < .01f,
+                "Safety instruction is not visible inside an opaque enclosure.");
+            ValidateEnclosureMesh(flow);
+            var camera = flow.round.playerView.desktopCamera;
+            Check(camera, "A rendering camera is required to verify the enclosure.");
+            var originalPosition = camera.transform.position;
+            var originalRotation = camera.transform.rotation;
+            var heading = Quaternion.LookRotation(Vector3.ProjectOnPlane(camera.transform.forward, Vector3.up).normalized);
+            try
+            {
+                // A visible forward instruction prevents blank/misconfigured rendering from passing black-view tests.
+                var forward = RenderProbe(camera, (run == 0 ? "Normal-" : "Boost-") + "Enclosure-Forward");
+                try
+                {
+                    Check(forward.GetPixels32().Count(pixel => pixel.r > 32 || pixel.g > 32 || pixel.b > 32) > 100,
+                        "Instruction disappeared when the enclosure became opaque.");
+                }
+                finally { Object.DestroyImmediate(forward); }
+
+                var directions = new[] { new Vector3(0, 90, 0), new Vector3(0, 180, 0), new Vector3(0, 270, 0),
+                    new Vector3(-90, 0, 0), new Vector3(90, 0, 0) };
+                var names = new[] { "Yaw90", "Yaw180", "Yaw270", "Up", "Down" };
+                for (int i = 0; i < directions.Length; i++)
+                {
+                    camera.transform.rotation = heading * Quaternion.Euler(directions[i]);
+                    var frame = RenderProbe(camera, (run == 0 ? "Normal-" : "Boost-") + "Enclosure-" + names[i]);
+                    try
+                    {
+                        var pixels = frame.GetPixels32();
+                        int bright = 0; long intensity = 0;
+                        foreach (var pixel in pixels)
+                        {
+                            int maximum = Math.Max(pixel.r, Math.Max(pixel.g, pixel.b));
+                            intensity += maximum;
+                            if (maximum > 12) bright++;
+                        }
+                        Check((double)intensity / pixels.Length < 2 && bright <= pixels.Length / 1000,
+                            "Room leaked through the opaque enclosure at " + names[i] + ": " + bright + " bright pixels.");
+                    }
+                    finally { Object.DestroyImmediate(frame); }
+                }
+            }
+            finally { camera.transform.SetPositionAndRotation(originalPosition, originalRotation); }
+        }
+
+        static void ValidateEnclosureMesh(KinoExperienceController flow)
+        {
+            var enclosure = flow.enclosure;
+            Check(Mathf.Abs(enclosure.BackgroundRenderer.transform.position.x) < .001f && Mathf.Abs(enclosure.BackgroundRenderer.transform.position.z) < .001f,
+                "Enclosure is not anchored at world X/Z zero.");
+            foreach (var renderer in new[] { enclosure.BackgroundRenderer, enclosure.FadeRenderer })
+            {
+                var filter = renderer.GetComponent<MeshFilter>();
+                Check(filter && filter.sharedMesh, "Enclosure renderer has no shell mesh.");
+                var mesh = filter.sharedMesh;
+                var vertices = mesh.vertices.Select(vertex => filter.transform.TransformPoint(vertex)).ToArray();
+                Check(vertices.Length > 20 && vertices.Min(vertex => vertex.y) >= -.001f,
+                    "Enclosure extends beneath its floor or has no curved shell.");
+                Check(Mathf.Abs(vertices.Min(vertex => vertex.y)) <= .005f && Mathf.Abs(vertices.Max(vertex => vertex.y) - 5) < .025f,
+                    "Enclosure floor/height differs from world Y zero / five metres.");
+                Check(Mathf.Abs(vertices.Min(vertex => vertex.x) + 6) < .025f && Mathf.Abs(vertices.Max(vertex => vertex.x) - 6) < .025f &&
+                    Mathf.Abs(vertices.Min(vertex => vertex.z) + 6) < .025f && Mathf.Abs(vertices.Max(vertex => vertex.z) - 6) < .025f,
+                    "Enclosure does not span six metres around world X/Z zero.");
+                var indices = mesh.triangles;
+                bool hasFloor = false;
+                for (int i = 0; i < indices.Length; i += 3)
+                {
+                    var a = vertices[indices[i]]; var b = vertices[indices[i + 1]]; var c = vertices[indices[i + 2]];
+                    if (Mathf.Abs(a.y) <= .005f && Mathf.Abs(b.y) <= .005f && Mathf.Abs(c.y) <= .005f &&
+                        Vector3.Cross(b - a, c - a).sqrMagnitude > .001f) { hasFloor = true; break; }
+                }
+                Check(hasFloor, "Enclosure has no opaque floor cap for looking straight down.");
+            }
+        }
+
+        static Texture2D RenderProbe(Camera camera, string name)
+        {
+            const int width = 800, height = 500;
+            var target = new RenderTexture(width, height, 24);
+            var old = camera.targetTexture; var active = RenderTexture.active;
+            var image = new Texture2D(width, height, TextureFormat.RGB24, false);
+            try
+            {
+                Canvas.ForceUpdateCanvases(); camera.targetTexture = target; camera.Render(); RenderTexture.active = target;
+                image.ReadPixels(new Rect(0, 0, width, height), 0, 0); image.Apply();
+                File.WriteAllBytes(KinoExperienceSetup.Output + "/" + name + ".png", image.EncodeToPNG());
+                return image;
+            }
+            catch { Object.DestroyImmediate(image); throw; }
+            finally { camera.targetTexture = old; RenderTexture.active = active; target.Release(); Object.DestroyImmediate(target); }
+        }
 
         static void ValidateBranding(KinoExperienceController flow, float elapsed)
         {
@@ -270,8 +446,8 @@ namespace KinoVR.Editor
                 "Branding duration does not include both logos and the black pause.");
             float allwyn = VisibleAlpha(flow.allwynLogo, flow.content), kino = VisibleAlpha(flow.kinoLogo, flow.content);
             Check(allwyn < .001f || kino < .001f, "Allwyn and KINO are visible together.");
-            Check(flow.backdrop.gameObject.activeInHierarchy && flow.backdrop.color == Color.black && flow.content.alpha > .99f,
-                "Branding does not have an opaque black backdrop.");
+            Check(flow.enclosure.BackgroundAlpha > .99f && flow.content.alpha > .99f,
+                "Branding does not have an opaque black enclosure.");
             Check(flow.title.text == "" && flow.body.text == "" && flow.footer.text == "", "Branding has extra screen text.");
             if (elapsed > flow.logoFadeSeconds && elapsed < flow.brandingSeconds - flow.logoFadeSeconds)
             {
@@ -305,6 +481,7 @@ namespace KinoVR.Editor
                 KinoRoundPhase.SecondChanceReveal, KinoRoundPhase.SecondChance }) Check(phases.Contains(phase), "Round phase missing: " + phase);
             foreach (var frame in new[] { "Branding-Allwyn", "Branding-Black", "Branding-KINO" })
                 Check(captured.Contains(frame), "Brand frame was not observable: " + frame);
+            Check(captured.Contains("Enclosure-360"), "360-degree opaque instruction enclosure was not verified.");
             Check(results == run + 1 && closed == run + 1, "Result or close event repeated/missing.");
             Check(flow.Record.externalConfirmationUtc == null && flow.Record.safetyElapsedUtc != null, "Timed safety mislabeled.");
             Check(flow.Record.normalCatches == 20 && flow.Record.secondChanceCatches == 3 && flow.round.State.BonusCaughtNumber != 0,
@@ -312,21 +489,20 @@ namespace KinoVR.Editor
             Check(flow.Record.boostCatches == flow.round.State.BoostLaunchCount && (run == 0 ? flow.Record.boostCatches == 0 : flow.Record.boostCatches > 0),
                 "Boost launches, catches or selected mode mismatch.");
             int expectedScore = 20 + KinoRoundState.BonusMultiplier * (1 + 3 + flow.Record.boostCatches);
-            Check(flow.Record.score == expectedScore && flow.round.score.CurrentScore == expectedScore, "Final score omits or duplicates a phase.");
-            Check(flow.blackout.color.a == 1 && flow.round.audioController.sessionVolume == 0, "Exit is not black and silent.");
+            Check(flow.Record.score == expectedScore && completedLiveScore == expectedScore, "Final score omits or duplicates a phase.");
+            Check(completedBlackout == 1 && completedAudio == 0, "Exit is not black and silent.");
             Check(Mathf.Abs(flow.kinoLogo.rectTransform.rect.width / flow.kinoLogo.rectTransform.rect.height -
                 (float)flow.kinoLogo.texture.width / flow.kinoLogo.texture.height) < .01f, "KINO logo aspect changed.");
         }
 
         static void VerifyRemount(KinoExperienceController flow)
         {
-            flow.ShowModeSelection();
             Check(flow.Stage == KinoExperienceStage.ModeSelection, "Completed Boost session cannot return to menu.");
             flow.BeginSession();
             Check(flow.Stage == KinoExperienceStage.Startup && flow.Record.sessionId != currentSession && flow.Record.score == 0 &&
                 !flow.State.IncludeBoost && !flow.Record.includeBoost, "Operator session did not reset to Normal.");
             flow.SendMessage("Unmounted");
-            Check(flow.Stage == KinoExperienceStage.Waiting && flow.Record.abortedUtc != null && flow.blackout.color.a == 1 && !flow.round.IsRunning,
+            Check(flow.Stage == KinoExperienceStage.Waiting && flow.Record.abortedUtc != null && flow.BlackoutAlpha == 1 && !flow.round.IsRunning,
                 "Headset removal failed.");
             flow.SendMessage("Mounted");
             remountPending = true; inputDeadline = EditorApplication.timeSinceStartup + 3;
@@ -339,7 +515,9 @@ namespace KinoVR.Editor
                 "both complete session orders; Allwyn -> black -> KINO with exclusive centered logos on black; world-space screens at 2.5m; " +
                 "20 normal catches + red bonus + 3 green catches per run; Normal skips Boost; selected Boost follows all greens and adds +3 per catch; " +
                 "one result/close event per session; result mode and Boost score; safety record semantics; text fit; " +
-                "black/silent completion; menu return, fresh operator session, abort and remount to selection.\n");
+                "floor-bound 360-degree enclosure at world origin; opaque instruction pixels verified at yaw 90/180/270 and straight up/down; " +
+                "black/silent completion; five real-second closing instruction; automatic menu return with unchanged records/events; " +
+                "fresh operator session, abort and remount to selection.\n");
             SessionState.SetBool(Key + "Passed", true); End();
         }
 

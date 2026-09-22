@@ -38,6 +38,11 @@ namespace KinoVR.Editor
                 if (flow.allwynLogo.texture != allwyn) flow.brandingSeconds = 3;
                 flow.allwynLogo.texture = allwyn;
                 if (!flow.modeCanvas) BuildModeSelection(flow, font);
+                flow.enclosure = ConfigureEnclosure(root);
+                flow.closingSeconds = 5;
+                RemoveChild(flow.contentCanvas.transform, "Quiet background");
+                RemoveChild(root.transform, "Session blackout");
+                RemoveChild(root.transform, "View blackout");
                 var manager = root.GetComponentInChildren<OVRManager>(true);
                 if (manager)
                 {
@@ -48,11 +53,7 @@ namespace KinoVR.Editor
                 if (round.secondChancePresentation)
                 {
                     round.secondChancePresentation.roomTreatment = round.boostPresentation;
-                    foreach (var image in round.secondChancePresentation.announcement.GetComponentsInChildren<Image>(true))
-                    {
-                        if (image.name == "Dark green backdrop") image.color = new Color(.005f, .025f, .09f, .98f);
-                        if (image.name == "Green upper line" || image.name == "Green lower line") image.color = new Color(.04f, .55f, 1);
-                    }
+                    ConfigureSecondChanceScreen(round.secondChancePresentation, font);
                 }
                 PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
             }
@@ -105,22 +106,57 @@ namespace KinoVR.Editor
             flow.content = canvas.gameObject.AddComponent<CanvasGroup>();
             flow.content.alpha = 0;
             flow.content.interactable = false; flow.content.blocksRaycasts = false;
-            flow.backdrop = NewImage("Quiet background", canvas.transform, Vector2.zero, new Vector2(10000, 10000));
             flow.title = Label("Title", canvas.transform, font, new Vector2(0, 225), new Vector2(1100, 100), 48);
             flow.body = Label("Message", canvas.transform, font, new Vector2(0, -5), new Vector2(1040, 330), 34);
             flow.footer = Label("Footer", canvas.transform, font, new Vector2(0, -245), new Vector2(1080, 65), 25);
             flow.footer.color = new Color(.68f, .83f, .93f);
             flow.allwynLogo = Logo("Allwyn original logo", canvas.transform, allwyn, new Vector2(0, 150), 480);
             flow.kinoLogo = Logo("KINO original logo", canvas.transform, kino, new Vector2(0, -110), 470);
-            // Move KINO above the score for finale without moving the physical screen.
-            var fade = NewCanvas("Session blackout", flow.transform, new Vector2(2, 2));
-            fade.sortingOrder = 32765;
-            flow.blackoutCanvas = fade;
-            flow.blackout = NewImage("Blackout", fade.transform, Vector2.zero, new Vector2(2, 2));
-            flow.blackout.material = AssetDatabase.LoadAssetAtPath<Material>("Assets/KINOVR/Materials/ViewFade.mat");
-            if (!flow.blackout.material) throw new InvalidOperationException("Missing stereo fade material.");
-            flow.blackout.color = Color.black;
-            fade.gameObject.SetActive(false);
+        }
+        static void RemoveChild(Transform parent, string name)
+        {
+            var child = parent.Find(name);
+            if (child) UnityEngine.Object.DestroyImmediate(child.gameObject);
+        }
+        internal static KinoBlackEnclosure ConfigureEnclosure(GameObject root)
+        {
+            var enclosure = root.GetComponent<KinoBlackEnclosure>();
+            if (!enclosure) enclosure = root.AddComponent<KinoBlackEnclosure>();
+            var shader = Shader.Find("KINO/Black Enclosure");
+            if (!shader) throw new InvalidOperationException("Missing 360-degree enclosure shader.");
+            Material Prepare(string name, int queue)
+            {
+                string path = "Assets/KINOVR/Materials/" + name + ".mat";
+                var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+                if (!material) { material = new Material(shader) { name = name }; AssetDatabase.CreateAsset(material, path); }
+                material.shader = shader;
+                material.renderQueue = queue;
+                material.SetColor("_Color", Color.black);
+                material.enableInstancing = true;
+                EditorUtility.SetDirty(material);
+                return material;
+            }
+            enclosure.backgroundMaterial = Prepare("EnclosureBackground", 3000);
+            enclosure.fadeMaterial = Prepare("EnclosureFade", 4100);
+            return enclosure;
+        }
+        internal static void ConfigureSecondChanceScreen(KinoSecondChancePresentation presentation, TMP_FontAsset font = null)
+        {
+            presentation.enclosure = ConfigureEnclosure(presentation.gameObject);
+            RemoveChild(presentation.transform, "View blackout");
+            if (presentation.announcementCanvas) return;
+            if (!font) font = PrepareFont();
+            if (presentation.announcement) UnityEngine.Object.DestroyImmediate(presentation.announcement);
+            var canvas = NewCanvas("Second Chance reading screen", presentation.transform, new Vector2(1100, 700));
+            canvas.transform.localScale = Vector3.one * .002f;
+            canvas.sortingOrder = 100;
+            presentation.announcementCanvas = canvas;
+            presentation.announcement = canvas.gameObject;
+            var texture = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/KINOVR/Textures/SecondChanceLogo.png");
+            Logo("Second Chance supplied logo", canvas.transform, texture, new Vector2(0, 90), 700);
+            Label("Extra balls", canvas.transform, font, new Vector2(0, -150), new Vector2(1000, 70), 40).text = "3 ΕΠΙΠΛΕΟΝ ΜΠΑΛΕΣ";
+            Label("Triple points", canvas.transform, font, new Vector2(0, -230), new Vector2(1000, 65), 34).text = "x3 ΠΟΝΤΟΙ";
+            canvas.gameObject.SetActive(false);
         }
         static Canvas NewCanvas(string name, Transform parent, Vector2 size)
         {
@@ -182,13 +218,16 @@ namespace KinoVR.Editor
             var flow = round.GetComponent<KinoExperienceController>();
             Require(flow && flow.round == round && round.experience == flow, "Session references missing.");
             Require(!round.startAutomatically && !round.showcaseBoostAfterSecondChance && !round.launcher.autoStart, "Launch bypass enabled.");
-            Require(flow.allwynLogo.texture && flow.kinoLogo.texture && flow.blackout.material, "Missing logo/fade.");
+            Require(flow.allwynLogo.texture && flow.kinoLogo.texture && flow.enclosure && flow.enclosure.backgroundMaterial && flow.enclosure.fadeMaterial, "Missing logo/enclosure.");
+            Require(!ShaderUtil.ShaderHasError(flow.enclosure.fadeMaterial.shader), "Enclosure shader error.");
+            Require(flow.closingSeconds == 5 && round.secondChancePresentation.enclosure == flow.enclosure && round.secondChancePresentation.announcementCanvas,
+                "Missing automatic reset timing or spherical Second Chance presentation.");
             Require(flow.contentCanvas.renderMode == RenderMode.WorldSpace && flow.modeCanvas && flow.normalModeButton && flow.boostModeButton, "Missing VR mode selection.");
             Require(flow.body.font.HasCharacters(flow.safetyText, out uint[] missing, true, false), "Missing Greek safety glyphs.");
             KinoExperienceTests.ValidateState();
             KinoSecondChanceTests.ValidateRules();
             Directory.CreateDirectory(Output);
-            File.WriteAllText(Output + "/validation.txt", "PASS: session references, supplied logos, Greek text, startup guards, Boost disabled, flow and round rules.\n");
+            File.WriteAllText(Output + "/validation.txt", "PASS: session references, supplied logos, Greek text, startup guards, Normal/Boost selection, 360-degree background/fades, five-second closing, flow and round rules.\n");
         }
         static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
         public static void ApplyBatch() { Apply(); }

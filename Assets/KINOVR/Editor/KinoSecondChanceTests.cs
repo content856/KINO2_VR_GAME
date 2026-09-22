@@ -123,9 +123,9 @@ namespace KinoVR.Editor
             var color = prefab.GetComponent<Catchable>().secondChanceCatchVFX.GetComponent<ParticleSystem>().main.startColor.color;
             Check(color.g > .9f && color.r < .1f, "Catch effect is not green.");
             var round = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/KINOVR/Prefabs/KinoTimedGameplay.prefab").GetComponent<KinoRoundController>();
-            Check(round.secondChancePresentation && round.secondChancePresentation.fadeImage && round.secondChancePresentation.announcement, "Missing transition references.");
+            Check(round.secondChancePresentation && round.secondChancePresentation.enclosure && round.secondChancePresentation.announcementCanvas && round.secondChancePresentation.announcement, "Missing transition references.");
             Check(round.board.secondChanceMarkerMaterial && round.board.multiplierLabels.All(t => t), "Missing green markers/multiplier labels.");
-            Check(!ShaderUtil.ShaderHasError(round.board.secondChanceMarkerMaterial.shader) && !ShaderUtil.ShaderHasError(round.secondChancePresentation.fadeImage.material.shader), "Board/fade shader error.");
+            Check(!ShaderUtil.ShaderHasError(round.board.secondChanceMarkerMaterial.shader) && !ShaderUtil.ShaderHasError(round.secondChancePresentation.enclosure.fadeMaterial.shader), "Board/fade shader error.");
             Check(round.secondChancePresentation.announcement.GetComponentInChildren<RawImage>(true).texture, "Missing logo texture.");
             Check(round.restartButton && round.restartButton.round == round && round.restartButton.button &&
                 round.restartButton.pressArea && !round.restartButton.gameObject.activeSelf, "Missing or initially visible restart button.");

@@ -1,27 +1,29 @@
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace KinoVR
 {
-    // One world-space canvas follows the active view, including both XR eyes.
-    // The board/title use the same game clock as the draw, so pause stays coherent.
+    // The announcement stays fixed at reading distance while the enclosure hides
+    // the room in every direction. The draw clock also drives its spherical fade.
     public sealed class KinoSecondChancePresentation : MonoBehaviour
     {
         public KinoPlayerView playerView;
         public GameObject announcement;
         public GameObject activeHeader;
         public GameObject normalBrand;
-        public Canvas viewFade;
-        public Image fadeImage;
+        public KinoBlackEnclosure enclosure;
+        public Canvas announcementCanvas;
         public KinoBoostPresentation roomTreatment;
-        bool blueRoom;
-        public float FadeAlpha => fadeImage ? fadeImage.color.a : 0;
+        bool blueRoom, revealing;
+        public float FadeAlpha { get; private set; }
 
         public void Present(KinoRoundState state, double now)
         {
             var phase = state.Phase;
             bool reveal = phase == KinoRoundPhase.SecondChanceReveal;
             bool active = phase == KinoRoundPhase.SecondChance;
+            if (reveal && !revealing) PositionAnnouncement();
+            revealing = reveal;
+            if (enclosure) enclosure.SetRoundBackground(reveal ? 1 : 0);
             bool blue = reveal || active;
             if (blueRoom != blue) { blueRoom = blue; if (roomTreatment) roomTreatment.SetSecondChanceLighting(blue); }
             if (announcement) announcement.SetActive(reveal);
@@ -33,25 +35,25 @@ namespace KinoVR
         }
         void SetFade(float alpha)
         {
-            if (!viewFade || !fadeImage) return;
-            fadeImage.color = new Color(0, 0, 0, alpha);
-            viewFade.gameObject.SetActive(alpha > 0);
-            FollowView();
+            FadeAlpha = Mathf.Clamp01(alpha);
+            if (enclosure) enclosure.SetRoundFade(FadeAlpha);
         }
-        void LateUpdate() { if (viewFade && viewFade.gameObject.activeSelf) FollowView(); }
-        void FollowView()
+        void PositionAnnouncement()
         {
-            if (!playerView || !playerView.View || !viewFade) return;
+            if (!playerView || !playerView.View || !announcementCanvas) return;
             var view = playerView.View;
-            var camera = view.GetComponent<Camera>();
-            float distance = camera ? camera.nearClipPlane + .02f : .2f;
-            viewFade.transform.SetPositionAndRotation(view.position + view.forward * distance, view.rotation);
-            viewFade.transform.localScale = Vector3.one * Mathf.Max(2, distance * 10);
+            var forward = Vector3.ProjectOnPlane(view.forward, Vector3.up);
+            if (forward.sqrMagnitude < .01f) forward = Vector3.forward;
+            var heading = Quaternion.LookRotation(forward.normalized);
+            announcementCanvas.transform.SetPositionAndRotation(view.position + heading * new Vector3(0, 0, 2.5f), heading);
+            announcementCanvas.worldCamera = view.GetComponent<Camera>();
         }
         public void ResetPresentation()
         {
             if (blueRoom && roomTreatment) roomTreatment.SetSecondChanceLighting(false);
             blueRoom = false;
+            revealing = false;
+            if (enclosure) enclosure.SetRoundBackground(0);
             if (announcement) announcement.SetActive(false);
             if (activeHeader) activeHeader.SetActive(false);
             if (normalBrand) normalBrand.SetActive(true);
