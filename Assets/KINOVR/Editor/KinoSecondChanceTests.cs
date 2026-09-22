@@ -146,6 +146,8 @@ namespace KinoVR.Editor
         }
         static void StartDraw(KinoRoundController round, int index, bool beginRound = true)
         {
+            // Round regressions exercise standalone restart/showcase; session flow has its own runner.
+            if (round.experience && round.experience.enabled) round.experience.enabled = false;
             KinoAudioTests.ObserveSequence(round);
             run = index; normalSeen = greenSeen = boostSeen = bonusChanges = 0;
             leases.Clear(); bonus = null; physicalCatchPending = false;

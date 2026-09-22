@@ -11,7 +11,8 @@ namespace KinoVR
         [Tooltip("Seconds each previously caught number stays visible on the red bonus ball.")]
         [Min(.25f)] public float bonusNumberInterval = 1;
         [Header("Client showcase (normal cycle ends after Second Chance)")]
-        public bool showcaseBoostAfterSecondChance = true;
+        public bool showcaseBoostAfterSecondChance = false;
+        [HideInInspector] public KinoExperienceController experience;
         [Min(1)] public float showcaseBoostDuration = 25;
         [Min(.25f)] public float showcaseBoostInterval = 1;
         // The gold presentation is used only by the optional client showcase.
@@ -117,7 +118,7 @@ namespace KinoVR
             if (launcher) launcher.SetPace(1, 1, 1);
             if (boostPresentation) boostPresentation.SetBoost(false);
             RefreshBoard();
-            if (restartButton) restartButton.Show();
+            if (restartButton && (!experience || !experience.isActiveAndEnabled)) restartButton.Show();
             onRoundFinished.Invoke();
         }
         void RefreshBoard()

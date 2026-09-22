@@ -13,6 +13,8 @@ namespace KinoVR
         public GameObject normalBrand;
         public Canvas viewFade;
         public Image fadeImage;
+        public KinoBoostPresentation roomTreatment;
+        bool blueRoom;
         public float FadeAlpha => fadeImage ? fadeImage.color.a : 0;
 
         public void Present(KinoRoundState state, double now)
@@ -20,6 +22,8 @@ namespace KinoVR
             var phase = state.Phase;
             bool reveal = phase == KinoRoundPhase.SecondChanceReveal;
             bool active = phase == KinoRoundPhase.SecondChance;
+            bool blue = reveal || active;
+            if (blueRoom != blue) { blueRoom = blue; if (roomTreatment) roomTreatment.SetSecondChanceLighting(blue); }
             if (announcement) announcement.SetActive(reveal);
             if (activeHeader) activeHeader.SetActive(active);
             if (normalBrand) normalBrand.SetActive(!reveal && !active && phase != KinoRoundPhase.Boost && phase != KinoRoundPhase.BoostSettling);
@@ -46,6 +50,8 @@ namespace KinoVR
         }
         public void ResetPresentation()
         {
+            if (blueRoom && roomTreatment) roomTreatment.SetSecondChanceLighting(false);
+            blueRoom = false;
             if (announcement) announcement.SetActive(false);
             if (activeHeader) activeHeader.SetActive(false);
             if (normalBrand) normalBrand.SetActive(true);

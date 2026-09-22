@@ -149,6 +149,15 @@ namespace KinoVR
             }
             if (volume) volume.weight = amount;
         }
+        public void SetSecondChanceLighting(bool active)
+        {
+            if (!initialized) Initialize();
+            if (!active) { if (!IsBoostActive) ApplyLighting(0); return; }
+            foreach (var pair in ledCopies)
+                pair.Value.SetColor("_EmissionColor", new Color(.04f, 1.2f, 3));
+            foreach (var pair in marbleCopies)
+                pair.Value.SetColor("_BaseColor", pair.Key.GetColor("_BaseColor") * new Color(.55f, .78f, 1, 1));
+        }
         // Used by the explicit editor preview command, without entering the game clock.
         public void PreviewBoost()
         {

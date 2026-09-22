@@ -16,6 +16,7 @@ namespace KinoVR
         [Range(0, 1)] public float announcementVolume = .8f;
         [Min(.1f)] public float musicCrossfadeSeconds = 1.25f;
         public bool countdownEnabled = true;
+        [HideInInspector, Range(0, 1)] public float sessionVolume = 1;
         [Header("Fixed sources (created in the prefab, reused during play)")]
         public AudioSource chillMusic;
         public AudioSource boostMusic;
@@ -120,6 +121,15 @@ namespace KinoVR
             if (round) Present(round.State);
         }
 
+        public void BeginSessionAudio()
+        {
+            if (!initialized || !isActiveAndEnabled) return;
+            finishAt = -1;
+            phase = KinoRoundPhase.Idle;
+            hasPhase = false;
+            ResumeLoops();
+        }
+
         public void Present(KinoRoundState state)
         {
             if (!initialized || suspended || !isActiveAndEnabled) return;
@@ -209,7 +219,7 @@ namespace KinoVR
             voiceGains[slot] = cue.volume;
             birdVoices[slot] = sound == KinoSound.Bird;
             voiceStarted[slot] = now;
-            source.volume = cue.volume * (birdVoices[slot] ? ambienceVolume : effectsVolume);
+            source.volume = sessionVolume * cue.volume * (birdVoices[slot] ? ambienceVolume : effectsVolume);
             source.Play();
             lastVariant[key] = variant;
             lastPlayed[key] = now;
@@ -243,15 +253,15 @@ namespace KinoVR
             bool speech = announcement && announcement.isPlaying;
             duck = Mathf.MoveTowards(duck, speech ? .28f : now < duckUntil ? .55f : 1, dt * (speech ? 6 : 2));
             idleBlend = Mathf.MoveTowards(idleBlend, idle ? 1 : 0, dt * .8f);
-            if (chillMusic) chillMusic.volume = musicVolume * (1 - boostBlend) * duck;
+            if (chillMusic) chillMusic.volume = sessionVolume * musicVolume * (1 - boostBlend) * duck;
             if (boostMusic)
             {
-                boostMusic.volume = musicVolume * boostBlend * duck;
+                boostMusic.volume = sessionVolume * musicVolume * boostBlend * duck;
                 if (!boosting && boostBlend == 0 && boostMusic.isPlaying) boostMusic.Stop();
             }
-            if (outdoorAmbience) outdoorAmbience.volume = ambienceVolume * Mathf.Lerp(.25f, 1, idleBlend);
-            if (machine) machine.volume = ambienceVolume * Mathf.Lerp(.8f, .15f, idleBlend);
-            if (announcement) announcement.volume = announcementVolume;
+            if (outdoorAmbience) outdoorAmbience.volume = sessionVolume * ambienceVolume * Mathf.Lerp(.25f, 1, idleBlend);
+            if (machine) machine.volume = sessionVolume * ambienceVolume * Mathf.Lerp(.8f, .15f, idleBlend);
+            if (announcement) announcement.volume = sessionVolume * announcementVolume;
             if (finishAt >= 0 && now >= finishAt)
             {
                 finishAt = -1;
@@ -279,7 +289,7 @@ namespace KinoVR
                     if (!following[i].gameObject.activeInHierarchy) { source.Stop(); following[i] = null; continue; }
                     source.transform.position = following[i].position;
                 }
-                source.volume = voiceGains[i] * (birdVoices[i] ? ambienceVolume : effectsVolume);
+                source.volume = sessionVolume * voiceGains[i] * (birdVoices[i] ? ambienceVolume : effectsVolume);
             }
         }
 
