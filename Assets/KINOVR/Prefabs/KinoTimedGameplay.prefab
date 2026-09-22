@@ -7718,7 +7718,6 @@ MonoBehaviour:
   allwynLogo: {fileID: 8589547006756400893}
   kinoLogo: {fileID: 5334530251692565233}
   enclosure: {fileID: 5433421039163707290}
-  interfaceHandMaterial: {fileID: 2100000, guid: 6580f264a297ee543a6f59dc75b3b012, type: 2}
   finaleBackgroundTransparency: 85
   closingBackgroundTransparency: 45
   contentDistance: 2.5

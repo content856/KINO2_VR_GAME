@@ -52,7 +52,6 @@ namespace KinoVR
         public TMP_Text title, body, footer;
         public RawImage allwynLogo, kinoLogo;
         public KinoBlackEnclosure enclosure;
-        public Material interfaceHandMaterial;
         public float BlackoutAlpha => enclosure ? enclosure.FadeAlpha : 0;
         [Header("Ending background transparency (%)")]
         [Tooltip("0 = solid black, 100 = fully transparent. Text stays opaque.")]
@@ -83,7 +82,7 @@ namespace KinoVR
             if (!round) { enabled = false; return; }
             round.experience = this;
             if (round.playerView && round.playerView.vrRig) trackedRig = round.playerView.vrRig.GetComponent<OVRCameraRig>();
-            modeHands = new KinoModeHands(round.playerView && round.playerView.vrRig ? round.playerView.vrRig.transform : null, interfaceHandMaterial);
+            modeHands = new KinoModeHands(round.playerView && round.playerView.vrRig ? round.playerView.vrRig.transform : null);
             round.startAutomatically = false;
             round.showcaseBoostAfterSecondChance = false;
             round.onRoundFinished.AddListener(FinishSessionRound);

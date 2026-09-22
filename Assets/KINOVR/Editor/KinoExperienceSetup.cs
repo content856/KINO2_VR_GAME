@@ -39,7 +39,6 @@ namespace KinoVR.Editor
                 flow.allwynLogo.texture = allwyn;
                 if (!flow.modeCanvas) BuildModeSelection(flow, font);
                 flow.enclosure = ConfigureEnclosure(root);
-                flow.interfaceHandMaterial = PrepareInterfaceHands();
                 flow.closingSeconds = 5;
                 RemoveChild(flow.contentCanvas.transform, "Quiet background");
                 RemoveChild(root.transform, "Session blackout");
@@ -118,20 +117,6 @@ namespace KinoVR.Editor
         {
             var child = parent.Find(name);
             if (child) UnityEngine.Object.DestroyImmediate(child.gameObject);
-        }
-        static Material PrepareInterfaceHands()
-        {
-            const string path = "Assets/KINOVR/Materials/InterfaceHands.mat";
-            var material = AssetDatabase.LoadAssetAtPath<Material>(path);
-            var shader = Shader.Find("KINO/Interface Hands");
-            if (!shader) throw new InvalidOperationException("Missing interface hand shader.");
-            if (!material) { material = new Material(shader) { name = "InterfaceHands" }; AssetDatabase.CreateAsset(material, path); }
-            material.shader = shader;
-            material.renderQueue = 3000;
-            material.SetColor("_Color", new Color(.55f, .82f, .95f, 1));
-            material.enableInstancing = true;
-            EditorUtility.SetDirty(material);
-            return material;
         }
         internal static KinoBlackEnclosure ConfigureEnclosure(GameObject root)
         {
@@ -235,7 +220,6 @@ namespace KinoVR.Editor
             Require(!round.startAutomatically && !round.showcaseBoostAfterSecondChance && !round.launcher.autoStart, "Launch bypass enabled.");
             Require(flow.allwynLogo.texture && flow.kinoLogo.texture && flow.enclosure && flow.enclosure.backgroundMaterial && flow.enclosure.fadeMaterial, "Missing logo/enclosure.");
             Require(!ShaderUtil.ShaderHasError(flow.enclosure.fadeMaterial.shader), "Enclosure shader error.");
-            Require(flow.interfaceHandMaterial && !ShaderUtil.ShaderHasError(flow.interfaceHandMaterial.shader), "Missing or invalid interface hand material.");
             Require(flow.closingSeconds == 5 && round.secondChancePresentation.enclosure == flow.enclosure && round.secondChancePresentation.announcementCanvas,
                 "Missing automatic reset timing or spherical Second Chance presentation.");
             Require(flow.contentCanvas.renderMode == RenderMode.WorldSpace && flow.modeCanvas && flow.normalModeButton && flow.boostModeButton, "Missing VR mode selection.");

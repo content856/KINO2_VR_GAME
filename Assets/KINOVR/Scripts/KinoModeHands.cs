@@ -18,12 +18,10 @@ namespace KinoVR
         }
 
         readonly List<Hand> hands = new List<Hand>(2);
-        readonly Material interfaceMaterial;
         bool disposed;
 
-        public KinoModeHands(Transform vrRig, Material material)
+        public KinoModeHands(Transform vrRig)
         {
-            interfaceMaterial = material;
             if (!vrRig) return;
             var seen = new HashSet<SkinnedMeshRenderer>();
             foreach (var catcher in vrRig.GetComponentsInChildren<HandCatcher>(true))
@@ -45,15 +43,16 @@ namespace KinoVR
             {
                 if (!hand.renderer) continue;
                 if (!visible) { Restore(hand); continue; }
-                if (!interfaceMaterial) continue;
                 if (hand.applied && hand.renderer.sharedMaterial == hand.menu) continue;
                 // Permit the SDK to supply a material after this helper is constructed.
                 if (!hand.original) hand.original = hand.renderer.sharedMaterial;
                 if (!hand.original) continue;
                 if (!hand.menu)
-                    hand.menu = new Material(interfaceMaterial)
+                    // Preserve the original shader, textures, colour and lighting.
+                    // Only the draw queue changes so the black enclosure cannot cover it.
+                    hand.menu = new Material(hand.original)
                     {
-                        name = "KINO instruction hand",
+                        name = hand.original.name + " (above instruction background)",
                         hideFlags = HideFlags.DontSave,
                         renderQueue = 3000
                     };

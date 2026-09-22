@@ -309,7 +309,7 @@ namespace KinoVR.Editor
             Check(captured.Contains("ending-score") && captured.Contains("live-setting") && captured.Contains("ending-closing") && captured.Contains("closing-held"),
                 "Ending checks missed a stage or the live Inspector setting update.");
             File.AppendAllText(KinoExperienceSetup.Output + "/ending-checks.txt",
-                "PASS: score 85% visible (15% black), removal 45% visible (55% black), live setting update, independent hand shading above the background, fade covers hands, stable removal transparency until reset.\n");
+                "PASS: score 85% visible (15% black), removal 45% visible (55% black), live setting update, original hand appearance above the background, fade covers hands, stable removal transparency until reset.\n");
             SessionState.SetBool(Key + "Passed", true); End();
         }
         static void VerifyEndingPixels(KinoExperienceController flow, float transmission)
@@ -319,15 +319,24 @@ namespace KinoVR.Editor
             var block = new MaterialPropertyBlock();
             enclosure.BackgroundRenderer.GetPropertyBlock(block);
             Check(Mathf.Abs(block.GetColor("_Color").a - (1 - transmission)) < .001f, "Wrong GPU background alpha.");
-            Check(flow.interfaceHandMaterial.shader.name == "KINO/Interface Hands", "Hands still use the room lighting shader.");
+            Material handMaterial = null;
+            var sourceRoot = AssetDatabase.LoadAssetAtPath<GameObject>(KinoExperienceSetup.PrefabPath);
             foreach (var catcher in flow.round.playerView.vrRig.GetComponentsInChildren<HandCatcher>(true))
             {
                 var hand = catcher.GetComponentInParent<OVRHand>(true);
                 if (!hand) continue;
                 var renderer = hand.GetComponent<SkinnedMeshRenderer>();
-                Check(renderer.sharedMaterial.shader == flow.interfaceHandMaterial.shader && renderer.sortingOrder == 75,
-                    "Tracked hand is behind the sphere or has the wrong material.");
+                string path = AnimationUtility.CalculateTransformPath(renderer.transform, flow.transform);
+                var source = sourceRoot.transform.Find(path).GetComponent<SkinnedMeshRenderer>().sharedMaterial;
+                handMaterial = renderer.sharedMaterial;
+                Check(handMaterial.shader == source.shader && handMaterial.shaderKeywords.SequenceEqual(source.shaderKeywords) &&
+                    handMaterial.renderQueue == 3000 && renderer.sortingOrder == 75, "Tracked hand appearance or draw order changed.");
+                foreach (string colour in new[] { "_BaseColor", "_Color" })
+                    if (source.HasProperty(colour)) Check(handMaterial.GetColor(colour) == source.GetColor(colour), "Hand tint changed.");
+                foreach (string texture in source.GetTexturePropertyNames())
+                    Check(handMaterial.GetTexture(texture) == source.GetTexture(texture), "Hand texture changed.");
             }
+            Check(handMaterial, "No original hand material found.");
             var go = new GameObject("Ending render probe", typeof(Camera));
             var camera = go.GetComponent<Camera>(); camera.enabled = false;
             camera.transform.position = new Vector3(0, 1.35f, 0);
@@ -360,18 +369,23 @@ namespace KinoVR.Editor
                 proxy.name = "Hand material render probe";
                 proxy.transform.position = camera.transform.position + Vector3.forward;
                 proxy.transform.localScale = Vector3.one * .35f;
-                var handRenderer = proxy.GetComponent<Renderer>(); handRenderer.sharedMaterial = flow.interfaceHandMaterial;
+                var handRenderer = proxy.GetComponent<Renderer>(); handRenderer.sharedMaterial = handMaterial;
                 handRenderer.sortingOrder = 75;
                 var handColour = Sample();
-                Check(handColour.g > .45f && handColour.b > .55f, "Instruction hands are dark without room lights: " + handColour);
+                enclosure.SetBackground(0);
+                var originalColour = Sample();
+                enclosure.SetBackground(1 - transmission);
+                Check(Mathf.Abs(handColour.r - originalColour.r) < .01f && Mathf.Abs(handColour.g - originalColour.g) < .01f &&
+                    Mathf.Abs(handColour.b - originalColour.b) < .01f, "Black background changes the original hand appearance.");
                 enclosure.SetSessionFade(1);
                 var faded = Sample();
                 Check(faded.maxColorComponent <= 1 && faded.r < .005f && faded.g < .005f && faded.b < .005f, "Full fade does not cover the hands.");
-                File.AppendAllText(KinoExperienceSetup.Output + "/ending-checks.txt", transmission.ToString("P0") + " transmission: all six views + opaque output alpha + bright hand proxy PASS\n");
+                File.AppendAllText(KinoExperienceSetup.Output + "/ending-checks.txt", transmission.ToString("P0") + " transmission: all six views + opaque output alpha + unchanged hand appearance PASS\n");
             }
             finally
             {
                 enclosure.SetSessionFade(0);
+                enclosure.SetBackground(1 - transmission);
                 enclosure.BackgroundRenderer.gameObject.layer = bgLayer; enclosure.FadeRenderer.gameObject.layer = fadeLayer;
                 RenderTexture.active = oldTarget;
                 if (proxy) Object.DestroyImmediate(proxy);
