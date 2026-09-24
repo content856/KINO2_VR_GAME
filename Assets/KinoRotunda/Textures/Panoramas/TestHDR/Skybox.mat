@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: TestHDR Background
+  m_Shader: {fileID: 4800000, guid: 6b8dfa668b0c1d843b27123cd57a2c8c, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap:
+    KinoPanoramaBaseYaw: 138.1709
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _MainTex:
+        m_Texture: {fileID: 2800000, guid: ab39f65ad96e498aadfe263fd9451915, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _BottomElevation: -90
+    - _Exposure: 1
+    - _Rotation: 146
+    - _VerticalDegrees: 125.775
+    m_Colors:
+    - _Nadir: {r: 0.17999998, g: 0.16999996, b: 0.13999996, a: 1}
+    - _Tint: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+    - _Zenith: {r: 0.0094, g: 0.33099997, b: 0.54999995, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
