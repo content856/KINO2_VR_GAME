@@ -76,6 +76,8 @@ namespace KinoRotunda.Editor
                     case "lottery-preview": KinoLottery.CaptureViews("After"); Status("LOTTERY_PREVIEWED"); break;
                     case "tubes-finish": KinoPerimeterTubes.Apply(); Status("TUBES_READY"); break;
                     case "tubes-preview": KinoPerimeterTubes.CaptureViews(); Status("TUBES_PREVIEWED"); break;
+                    case "cloud-layer": KinoCloudLayerSetup.Apply(); Status("CLOUD_LAYER_READY"); break;
+                    case "cloud-preview": KinoCloudLayerSetup.CapturePreview(); Status("CLOUD_LAYER_PREVIEWED"); break;
                     default: throw new ArgumentException("Unknown KINO editor command: " + command);
                 }
             }
