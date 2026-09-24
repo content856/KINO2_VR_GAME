@@ -53,6 +53,9 @@ namespace KinoVR.Editor
                 switch (command)
                 {
                     case "inspect": Inspect(); break;
+                    case "main-specials": KinoMainSpecialSetup.Apply(); Status("MAIN_SPECIALS_READY"); break;
+                    case "main-specials-preview": KinoMainSpecialSetup.Preview(); Status("MAIN_SPECIALS_PREVIEW_READY"); break;
+                    case "main-specials-test": KinoMainSpecialTests.ValidateRules(); KinoMainSpecialSetup.ValidateAssets(); KinoExperienceTests.RunDesktopInOpenEditor(); break;
                     case "setup": Setup(); break;
                     case "preview": Preview(); break;
                     case "pack": Pack(); break;

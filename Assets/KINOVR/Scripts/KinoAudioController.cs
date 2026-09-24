@@ -175,9 +175,9 @@ namespace KinoVR
 
         public void PlayCatch(Catchable.BallType type, Vector3 position)
         {
-            var sound = type == Catchable.BallType.KinoBonus ? KinoSound.CatchBonus :
+            var sound = type == Catchable.BallType.KinoBonus || type == Catchable.BallType.MoreWins ? KinoSound.CatchBonus :
                 type == Catchable.BallType.SecondChance ? KinoSound.CatchGreen :
-                type == Catchable.BallType.KinoBoost ? KinoSound.CatchBoost : KinoSound.CatchNormal;
+                type == Catchable.BallType.KinoBoost || type == Catchable.BallType.Mystery ? KinoSound.CatchBoost : KinoSound.CatchNormal;
             Play(sound, position);
         }
 

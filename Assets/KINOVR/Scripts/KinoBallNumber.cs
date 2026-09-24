@@ -9,6 +9,10 @@ namespace KinoVR
         public Transform face;
         public Material kinoBonusMaterial;
         public Material secondChanceMaterial;
+        public Material glowMaterial;
+        public Material mysteryMaterial;
+        public GameObject glowHalo;
+        bool mystery;
         [Tooltip("Baked oval mesh radii; the root and label keep uniform scale.")]
         public Vector3 surfaceRadii = new Vector3(.63f, .375f, .375f);
         [SerializeField, HideInInspector] int number = 1;
@@ -19,7 +23,7 @@ namespace KinoVR
         Color normalNumberColor;
         bool appearanceCached;
 
-        public void SetBonus(bool isBonus, bool isSecondChance = false)
+        public void SetBonus(bool isBonus, bool isSecondChance = false, bool isGlow = false, bool isMystery = false)
         {
             if (!appearanceCached)
             {
@@ -28,9 +32,12 @@ namespace KinoVR
                 normalNumberColor = numberLabel ? numberLabel.color : Color.black;
                 appearanceCached = true;
             }
+            mystery = isMystery;
+            if (glowHalo) glowHalo.SetActive(isGlow && !isBonus && !isSecondChance && !isMystery);
             if (ballRenderer) ballRenderer.sharedMaterial = isBonus && kinoBonusMaterial ? kinoBonusMaterial :
-                isSecondChance && secondChanceMaterial ? secondChanceMaterial : normalMaterial;
-            if (numberLabel) numberLabel.color = isBonus || isSecondChance ? Color.white : normalNumberColor;
+                isSecondChance && secondChanceMaterial ? secondChanceMaterial : isMystery && mysteryMaterial ? mysteryMaterial :
+                isGlow && glowMaterial ? glowMaterial : normalMaterial;
+            if (numberLabel) numberLabel.color = isBonus || isSecondChance || isMystery ? Color.white : normalNumberColor;
         }
         static readonly string[] NumberText = MakeNumberText();
         static string[] MakeNumberText()
@@ -44,7 +51,7 @@ namespace KinoVR
         {
             number = value;
             viewer = view;
-            if (numberLabel) numberLabel.text = NumberText[Mathf.Clamp(number, 0, 80)];
+            if (numberLabel) numberLabel.text = mystery ? "?" : NumberText[Mathf.Clamp(number, 0, 80)];
             RefreshFacing();
         }
         void LateUpdate() => RefreshFacing();

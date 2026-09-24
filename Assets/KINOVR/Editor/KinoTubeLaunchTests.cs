@@ -61,6 +61,7 @@ namespace KinoVR.Editor
                 var launcher = round.launcher;
                 if (stage == 0)
                 {
+                    round.enableMainSpecialBalls = false;
                     round.BeginRound(60); launcher.StopLaunching(true);
                     launcher.round = null; // Exercise pool/physics independently of the fixed 20-slot draw.
                     if (SessionState.GetBool(Key + ".Strong", false)) { launcher.turbulence = 1.2f; launcher.turbulenceFrequency = 1.5f; }

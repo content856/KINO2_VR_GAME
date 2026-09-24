@@ -223,7 +223,8 @@ namespace KinoVR.Editor
                 foreach (var ball in Object.FindObjectsByType<KinoPooledBall>(FindObjectsSortMode.None))
                 {
                     var catchable = ball.GetComponent<Catchable>();
-                    if (ball.gameObject.activeInHierarchy && flow.round.IsRunning && catchable) catchable.Catch();
+                    if (ball.gameObject.activeInHierarchy && flow.round.IsRunning && catchable)
+                        KinoMainSpecialTests.CatchAndCheck(flow.round, catchable);
                 }
                 float elapsed = (float)(GetClock(flow) - flow.State.EnteredAt);
                 if (flow.Stage == KinoExperienceStage.Safety && elapsed > 1 && !captured.Contains("Enclosure-360"))
@@ -633,7 +634,9 @@ namespace KinoVR.Editor
                 "Normal, red bonus or Second Chance catch quota mismatch.");
             Check(flow.Record.boostCatches == flow.round.State.BoostLaunchCount && (run == 0 ? flow.Record.boostCatches == 0 : flow.Record.boostCatches > 0),
                 "Boost launches, catches or selected mode mismatch.");
-            int expectedScore = 20 + KinoRoundState.BonusMultiplier * (1 + 3 + flow.Record.boostCatches);
+            Check(flow.round.State.GlowCatchCount == flow.round.State.GlowTargetCount &&
+                flow.round.State.MysteryCatchCount == flow.round.State.MysteryTargetCount, "Special catch quota mismatch.");
+            int expectedScore = flow.round.State.MainScore + KinoRoundState.BonusMultiplier * (1 + 3 + flow.Record.boostCatches);
             Check(flow.Record.score == expectedScore && completedLiveScore == expectedScore, "Final score omits or duplicates a phase.");
             Check(completedBlackout == 1 && completedAudio == 0, "Exit is not black and silent.");
             Check(Mathf.Abs(flow.kinoLogo.rectTransform.rect.width / flow.kinoLogo.rectTransform.rect.height -
@@ -658,7 +661,9 @@ namespace KinoVR.Editor
             File.WriteAllText(KinoExperienceSetup.Output + "/play-test.txt",
                 "PASS: Normal click and Boost physical hand selection; debounce and duplicate-selection guards; no early balls; " +
                 "both complete session orders; Allwyn -> black -> KINO with exclusive centered logos on black; world-space screens at 2.5m; " +
-                "20 normal catches + red bonus + 3 green catches per run; Normal skips Boost; selected Boost follows all greens and adds +3 per catch; " +
+                "20 numbered catches including 2-6 glow + 2-6 extra Mystery + red bonus + 3 green catches per run; " +
+                "live special appearance, material and halo reset; contact popup value/location and duplicate guards; " +
+                "Normal skips Boost; selected Boost follows all greens and adds +3 per catch; " +
                 "one result/close event per session; result mode and Boost score; safety record semantics; text fit; " +
                 "floor-bound 360-degree enclosure at world origin; opaque instruction pixels verified at yaw 90/180/270 and straight up/down; " +
                 "black/silent completion; five real-second closing instruction; automatic menu return with unchanged records/events; " +

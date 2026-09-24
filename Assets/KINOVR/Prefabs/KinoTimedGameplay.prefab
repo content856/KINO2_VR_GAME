@@ -7478,6 +7478,7 @@ GameObject:
   - component: {fileID: 813705974499032831}
   - component: {fileID: 9195522549210566129}
   - component: {fileID: 5433421039163707290}
+  - component: {fileID: 4069432944503056819}
   m_Layer: 0
   m_Name: KinoTimedGameplay
   m_TagString: Untagged
@@ -7526,6 +7527,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::KinoVR.KinoRoundController
   roundDuration: 60
   startAutomatically: 0
+  enableMainSpecialBalls: 1
+  catchFeedback: {fileID: 4069432944503056819}
   bonusNumberInterval: 1
   showcaseBoostAfterSecondChance: 0
   experience: {fileID: 9195522549210566129}
@@ -7743,6 +7746,20 @@ MonoBehaviour:
   floorY: 0.003
   backgroundMaterial: {fileID: 2100000, guid: b76150fb064d0b146bc4dcf89362c0f5, type: 2}
   fadeMaterial: {fileID: 2100000, guid: ea689858bccd6b041b7fa22e45e833f6, type: 2}
+--- !u!114 &4069432944503056819
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1151827303558133161}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0b2a2a5b94a8e5c46add8ac73b7e6543, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::KinoVR.KinoCatchFeedback
+  font: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  textMaterial: {fileID: 2100000, guid: 6143aa61a4326e140a86f9e2ad3c5840, type: 2}
 --- !u!1 &1161899757622532851
 GameObject:
   m_ObjectHideFlags: 0

@@ -128,6 +128,7 @@ namespace KinoVR.Editor
                 if (stage == 0)
                 {
                     ObserveSequence(round);
+                    round.enableMainSpecialBalls = false;
                     round.BeginRound(60);
                     round.launcher.StopLaunching(true);
                     ball = round.launcher.SpawnBall(0);

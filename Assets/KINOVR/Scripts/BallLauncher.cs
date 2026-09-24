@@ -120,9 +120,11 @@ public class BallLauncher : MonoBehaviour
         bool isKinoBonus = round && round.State.Phase == KinoRoundPhase.Bonus;
         bool isSecondChance = round && round.State.Phase == KinoRoundPhase.SecondChance;
         bool isBoost = round && round.State.Phase == KinoRoundPhase.Boost;
+        bool isMystery = round && round.State.ShouldLaunchMystery(Time.timeAsDouble);
+        bool isGlow = round && !isMystery && !isKinoBonus && !isSecondChance && !isBoost && round.State.NextNormalIsGlow;
         if (round && (isKinoBonus ? round.State.BonusLaunched || round.State.UniqueCount == 0 :
             isSecondChance ? !round.State.IsSecondChanceLaunchDue(Time.timeAsDouble) :
-            isBoost ? !round.State.IsBoostLaunchDue(Time.timeAsDouble) : !round.State.IsNormalLaunchDue(Time.timeAsDouble))) return null;
+            isBoost ? !round.State.IsBoostLaunchDue(Time.timeAsDouble) : !isMystery && !round.State.IsNormalLaunchDue(Time.timeAsDouble))) return null;
         if (!isActiveAndEnabled || spawnPoints == null || spawnPoints.Length == 0 || !ballPrefab || !player) return null;
         int index = spawnIndex < 0 ? nextTube++ % spawnPoints.Length : spawnIndex % spawnPoints.Length;
         var spawn = spawnPoints[index];
@@ -132,12 +134,13 @@ public class BallLauncher : MonoBehaviour
         if (available.Count == 0) return null;
         if (round && !(isKinoBonus ? round.State.TryRegisterBonusLaunch() : isSecondChance ?
             round.State.TryRegisterSecondChanceLaunch(Time.timeAsDouble) : isBoost ? round.State.TryRegisterBoostLaunch(Time.timeAsDouble) :
+            isMystery ? round.State.TryRegisterMysteryLaunch(Time.timeAsDouble) :
             round.State.TryRegisterNormalLaunch(Time.timeAsDouble))) return null;
         var ball = available.Pop();
         var exit = exitPoints != null && index < exitPoints.Length ? exitPoints[index] : null;
         ActiveBallCount++;
-        int number = isKinoBonus || isBoost ? round.State.GetCaughtNumber(Random.Range(0, round.State.UniqueCount)) : Random.Range(1, 81);
-        ball.Activate(spawn, exit, number, isKinoBonus, isSecondChance, isBoost);
+        int number = isMystery ? 0 : isKinoBonus || isBoost ? round.State.GetCaughtNumber(Random.Range(0, round.State.UniqueCount)) : Random.Range(1, 81);
+        ball.Activate(spawn, exit, number, isKinoBonus, isSecondChance, isBoost, isGlow, isMystery);
         return ball.gameObject;
     }
     internal void Recycle(KinoPooledBall ball)

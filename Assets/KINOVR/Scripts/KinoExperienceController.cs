@@ -17,6 +17,7 @@ namespace KinoVR
         public int score, normalCatches, secondChanceCatches;
         public bool includeBoost;
         public int boostCatches;
+        public int glowCatches, mysteryCatches, mainScore;
     }
 
     [DefaultExecutionOrder(-300), DisallowMultipleComponent]
@@ -194,6 +195,9 @@ namespace KinoVR
             if (!isActiveAndEnabled || !State.Finish(clock)) return;
             Record.score = round.State.Score;
             Record.normalCatches = round.State.NormalCatchCount;
+            Record.glowCatches = round.State.GlowCatchCount;
+            Record.mysteryCatches = round.State.MysteryCatchCount;
+            Record.mainScore = round.State.MainScore;
             Record.secondChanceCatches = round.State.SecondChanceCatchCount;
             Record.boostCatches = round.State.BoostCatchCount;
             Record.completedUtc = Utc;

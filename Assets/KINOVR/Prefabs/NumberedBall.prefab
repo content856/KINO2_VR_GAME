@@ -229,6 +229,96 @@ Canvas:
   m_SortingLayerID: 0
   m_SortingOrder: 0
   m_TargetDisplay: 0
+--- !u!1 &7589441823366310249
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 916980059588993038}
+  - component: {fileID: 909877271795093202}
+  - component: {fileID: 1464520139354188954}
+  m_Layer: 0
+  m_Name: Glow halo
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!4 &916980059588993038
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7589441823366310249}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1.32, y: 1.32, z: 1.32}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 7558716088591249141}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!33 &909877271795093202
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7589441823366310249}
+  m_Mesh: {fileID: 4300000, guid: 175204f6169a8be419f9a7a8d3a10580, type: 2}
+--- !u!23 &1464520139354188954
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7589441823366310249}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 0
+  m_ReflectionProbeUsage: 0
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: b7412333a5e630d45823fce74ab48f5a, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
 --- !u!1 &8138369570192128539
 GameObject:
   m_ObjectHideFlags: 0
@@ -265,6 +355,7 @@ Transform:
   m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 5065417553150914828}
+  - {fileID: 916980059588993038}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!33 &6947146434952978516
@@ -365,8 +456,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Catchable
   ballType: 0
   pointValue: 1
-  mysteryMinBonus: 5
-  mysteryMaxBonus: 25
   catchVFX: {fileID: 3332431955755207746, guid: edb126944d3bfaf41a74d2c9bafa572b, type: 3}
   kinoBonusCatchVFX: {fileID: 2841306624698117062, guid: da84c27472421e04d8a759495d62dd77, type: 3}
   secondChanceCatchVFX: {fileID: 6267122457161391881, guid: 8cf4de0bec8db3641b37cc2941c15a5b, type: 3}
@@ -390,6 +479,9 @@ MonoBehaviour:
   face: {fileID: 5065417553150914828}
   kinoBonusMaterial: {fileID: 2100000, guid: 089f4b679c7c5ca47aca7c5fc9054a11, type: 2}
   secondChanceMaterial: {fileID: 2100000, guid: 30f3bb1ee83cda74ea3a20a578b051a6, type: 2}
+  glowMaterial: {fileID: 2100000, guid: c88f3d42a1adafa4182886318e6da6dd, type: 2}
+  mysteryMaterial: {fileID: 2100000, guid: 7d9e454c9cfb7114a8015913c5a3db08, type: 2}
+  glowHalo: {fileID: 7589441823366310249}
   surfaceRadii: {x: 0.63, y: 0.375, z: 0.375}
   number: 1
 --- !u!136 &8140591606145640209

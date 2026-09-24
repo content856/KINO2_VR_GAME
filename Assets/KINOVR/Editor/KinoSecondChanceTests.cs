@@ -153,6 +153,7 @@ namespace KinoVR.Editor
             leases.Clear(); bonus = null; physicalCatchPending = false;
             restartPending = restartInputSent = false;
             round.showcaseBoostAfterSecondChance = run == 0;
+            round.enableMainSpecialBalls = false; // This runner isolates the legacy phase/audio contract.
             if (beginRound) round.BeginRound(60);
             startedAt = round.State.PhaseStartedAt;
             previous = KinoRoundPhase.Main; phaseAt = startedAt;

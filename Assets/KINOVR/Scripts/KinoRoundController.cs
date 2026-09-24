@@ -7,6 +7,9 @@ namespace KinoVR
     {
         [Min(1)] public float roundDuration = 60;
         public bool startAutomatically = true;
+        [Header("Main draw: glow and extra Mystery balls")]
+        public bool enableMainSpecialBalls = true;
+        public KinoCatchFeedback catchFeedback;
         [Header("KINO Bonus (after the 20-ball draw)")]
         [Tooltip("Seconds each previously caught number stays visible on the red bonus ball.")]
         [Min(.25f)] public float bonusNumberInterval = 1;
@@ -38,7 +41,8 @@ namespace KinoVR
         public void BeginRound(float duration)
         {
             if (launcher) launcher.StopLaunching(true);
-            State.Begin(duration, Time.timeAsDouble);
+            State.Begin(duration, Time.timeAsDouble, enableMainSpecialBalls ? (int?)Random.Range(0, int.MaxValue) : null);
+            if (catchFeedback) catchFeedback.ResetFeedback(playerView ? playerView.View : null);
             finishPresented = false;
             if (restartButton) restartButton.Hide();
             if (boostPresentation) boostPresentation.SetBoost(false);
@@ -65,7 +69,7 @@ namespace KinoVR
                 State.Tick(Time.timeAsDouble);
                 // Keep the last flight catchable before each transition.
                 bool noFlights = !launcher || launcher.ActiveBallCount == 0;
-                if (State.Phase == KinoRoundPhase.Settling && State.ResolvedNormalCount == KinoRoundState.NormalBallLimit && noFlights)
+                if (State.Phase == KinoRoundPhase.Settling && State.MainDrawResolved && noFlights)
                 {
                     if (!State.TryBeginBonus()) State.TryBeginSecondChanceTransition(Time.timeAsDouble);
                 }
@@ -90,13 +94,16 @@ namespace KinoVR
         {
             RefreshClock();
             int previousScore = State.Score;
-            if (!State.TryCatch(number, Time.timeAsDouble, ballType == Catchable.BallType.KinoBonus, ballType == Catchable.BallType.SecondChance, ballType == Catchable.BallType.KinoBoost))
+            bool accepted = ballType == Catchable.BallType.Mystery ? State.TryCatchMystery(Random.Range(2, 5), Time.timeAsDouble) :
+                State.TryCatch(number, Time.timeAsDouble, ballType == Catchable.BallType.KinoBonus,
+                    ballType == Catchable.BallType.SecondChance, ballType == Catchable.BallType.KinoBoost, ballType == Catchable.BallType.MoreWins);
+            if (!accepted)
             {
                 if (!State.IsRunning && !finishPresented) FinishRound();
                 return false;
             }
             if (score) score.AddScore(State.Score - previousScore, ballType);
-            if (board)
+            if (board && ballType != Catchable.BallType.Mystery)
             {
                 board.MarkCaught(number, ballType == Catchable.BallType.KinoBonus, ballType == Catchable.BallType.SecondChance);
                 if (ballType == Catchable.BallType.KinoBoost) board.ShowMultiplier(number);
@@ -104,10 +111,11 @@ namespace KinoVR
             RefreshBoard();
             return true;
         }
-        public void MissBall(bool isKinoBonus, bool isSecondChance = false, bool isBoost = false)
+        public void MissBall(bool isKinoBonus, bool isSecondChance = false, bool isBoost = false, bool isGlow = false, bool isMystery = false)
         {
             State.Tick(Time.timeAsDouble);
-            State.TryMiss(isKinoBonus, isSecondChance, isBoost);
+            if (isMystery) State.TryMissMystery();
+            else State.TryMiss(isKinoBonus, isSecondChance, isBoost, isGlow);
         }
         public void FinishRound()
         {
@@ -123,6 +131,7 @@ namespace KinoVR
         }
         void RefreshBoard()
         {
+            if (catchFeedback) catchFeedback.Present(State);
             if (audioController) audioController.Present(State);
             if (board) board.SetRoundProgress(State, finishPresented);
             if (secondChancePresentation) secondChancePresentation.Present(State, Time.timeAsDouble);

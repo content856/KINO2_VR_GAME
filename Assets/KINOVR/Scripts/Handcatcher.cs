@@ -18,7 +18,7 @@ public class HandCatcher : MonoBehaviour
         Catchable ball = other.GetComponent<Catchable>();
         if (ball != null)
         {
-            ball.Catch();
+            ball.CatchAt(other.ClosestPoint(transform.position));
         }
     }
 }

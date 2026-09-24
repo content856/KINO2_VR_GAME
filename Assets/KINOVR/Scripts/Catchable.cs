@@ -15,6 +15,8 @@ public class Catchable : MonoBehaviour
     public bool IsKinoBonus => ballType == BallType.KinoBonus;
     public bool IsSecondChance => ballType == BallType.SecondChance;
     public bool IsBoost => ballType == BallType.KinoBoost;
+    public bool IsGlow => ballType == BallType.MoreWins;
+    public bool IsMystery => ballType == BallType.Mystery;
     internal void SetLiveNumber(int number)
     {
         if (!caught) Number = Mathf.Clamp(number, 1, 80);
@@ -33,22 +35,19 @@ public class Catchable : MonoBehaviour
         roundControlled = false;
         ballType = BallType.Normal;
     }
-    public void Configure(int number, KinoRoundController controller, bool isKinoBonus = false, bool isSecondChance = false, bool isBoost = false)
+    public void Configure(int number, KinoRoundController controller, bool isKinoBonus = false, bool isSecondChance = false, bool isBoost = false, bool isGlow = false, bool isMystery = false)
     {
         caught = false;
-        Number = Mathf.Clamp(number, 1, 80);
+        Number = isMystery ? 0 : Mathf.Clamp(number, 1, 80);
         round = controller;
         roundControlled = controller != null;
-        ballType = isKinoBonus ? BallType.KinoBonus : isSecondChance ? BallType.SecondChance : isBoost ? BallType.KinoBoost : BallType.Normal;
+        ballType = isKinoBonus ? BallType.KinoBonus : isSecondChance ? BallType.SecondChance : isBoost ? BallType.KinoBoost :
+            isMystery ? BallType.Mystery : isGlow ? BallType.MoreWins : BallType.Normal;
     }
 
     [Header("Scoring")]
     public BallType ballType = BallType.Normal;
     public int pointValue = 1;
-
-    [Header("Mystery Ball (only used if ballType = Mystery)")]
-    public int mysteryMinBonus = 5;
-    public int mysteryMaxBonus = 25;
 
     [Header("Feedback")]
     public GameObject catchVFX;
@@ -61,7 +60,8 @@ public class Catchable : MonoBehaviour
 
     private bool caught = false;
 
-    public void Catch()
+    public void Catch() => CatchAt(transform.position);
+    public void CatchAt(Vector3 contactPoint)
     {
         // Guards against both hands, or multiple colliders on one hand,
         // triggering the same ball twice in the same frame.
@@ -75,11 +75,9 @@ public class Catchable : MonoBehaviour
             return;
         }
 
-        int awarded = pointValue * (IsKinoBonus || IsSecondChance || IsBoost ? KinoRoundState.BonusMultiplier : 1);
-        if (ballType == BallType.Mystery)
-        {
-            awarded = Random.Range(mysteryMinBonus, mysteryMaxBonus + 1);
-        }
+        int awarded = IsMystery ? 0 : IsGlow ? 2 : pointValue * (IsKinoBonus || IsSecondChance || IsBoost ? KinoRoundState.BonusMultiplier : 1);
+        if (roundControlled && round && round.catchFeedback)
+            round.catchFeedback.Show(contactPoint, ballType, round.State.LastMysteryMultiplier);
 
         if (!roundControlled && ScoreManager.Instance) ScoreManager.Instance.AddScore(awarded, ballType);
 
@@ -103,7 +101,7 @@ public class Catchable : MonoBehaviour
         if (caught || !isActiveAndEnabled) return;
         caught = true;
         uint generation = poolBall ? poolBall.Generation : 0;
-        if (roundControlled && round) round.MissBall(IsKinoBonus, IsSecondChance, IsBoost);
+        if (roundControlled && round) round.MissBall(IsKinoBonus, IsSecondChance, IsBoost, IsGlow, IsMystery);
         if (hitFloor && roundControlled && round && round.audioController)
             round.audioController.Play(KinoSound.BallMiss, transform.position);
         Release(generation);

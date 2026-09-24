@@ -6,6 +6,8 @@ Shader "KINO/Ball Lacquer"
         _EnvironmentAmount ("Room lighting influence", Range(0,1)) = .16
         _BonusRed ("KINO Bonus red palette", Range(0,1)) = 0
         _SecondChanceGreen ("Second Chance green palette", Range(0,1)) = 0
+        _MysteryDark ("Dark Mystery palette", Range(0,1)) = 0
+        _Glow ("Glow brightness", Range(0,1)) = 0
         [HideInInspector] _BaseMap ("Base map", 2D) = "white" {}
         [HideInInspector] _Cutoff ("Cutoff", Float) = .5
         [HideInInspector] _Cull ("Cull", Float) = 2
@@ -31,6 +33,8 @@ Shader "KINO/Ball Lacquer"
                 float _EnvironmentAmount;
                 float _BonusRed;
                 float _SecondChanceGreen;
+                float _MysteryDark;
+                float _Glow;
             CBUFFER_END
             struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct Varyings
@@ -62,6 +66,10 @@ Shader "KINO/Ball Lacquer"
                 Light light = GetMainLight();
                 float3 room = SampleSH(normalWS) + light.color * saturate(dot(normalWS, light.direction));
                 gold *= lerp(float3(1, 1, 1), clamp(room, .35, 1.25), _EnvironmentAmount);
+                float facing = saturate(dot(normalWS, normalize(GetCameraPositionWS() - input.positionWS)));
+                float rim = pow(1 - facing, 2);
+                gold = lerp(gold, float3(.022, .018, .035) + rim * float3(.12, .085, .17), _MysteryDark);
+                gold += _Glow * (float3(.48, .3, .015) + rim * float3(1.5, .85, .12));
                 return half4(MixFog(gold, input.fog), 1);
             }
             ENDHLSL
