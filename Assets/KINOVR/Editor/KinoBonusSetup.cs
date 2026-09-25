@@ -74,10 +74,9 @@ namespace KinoVR.Editor
             try
             {
                 ConfigureKinoBonusBoard(gameplay.GetComponentInChildren<KinoNumberBoard>(true));
-                gameplay.GetComponent<KinoRoundController>().roundDuration = 60;
                 gameplay.GetComponent<KinoRoundController>().bonusNumberInterval = 1;
                 var initialState = new KinoRoundState();
-                initialState.Begin(60, 0);
+                initialState.Begin(gameplay.GetComponent<KinoRoundController>().roundDuration, 0);
                 var board = gameplay.GetComponentInChildren<KinoNumberBoard>(true);
                 board.ResetBoard();
                 board.SetRoundProgress(initialState, false);

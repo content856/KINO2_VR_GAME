@@ -47,7 +47,6 @@ namespace KinoVR
             whooshPlayed = false;
             phase = Random.Range(0f, Mathf.PI * 2);
             riseTime = Mathf.Max(.2f, owner.EffectiveTubeRiseTime);
-            flightDuration = Mathf.Max(.2f, owner.EffectiveFlightTime * Random.Range(1 - owner.speedVariance, 1 + owner.speedVariance));
             expiresAt = Time.timeAsDouble + Mathf.Max(1, owner.ballLifetime);
             start = spawn.position;
             exit = outlet ? outlet.position : start;
@@ -62,6 +61,9 @@ namespace KinoVR
             body.interpolation = RigidbodyInterpolation.Interpolate;
             body.collisionDetectionMode = rising ? CollisionDetectionMode.ContinuousSpeculative : CollisionDetectionMode.ContinuousDynamic;
             catchable.Configure(number, owner.round, isKinoBonus, isSecondChance, isBoost, isGlow, isMystery);
+            // Snapshot the type and Boost pace for this lease; active flights never jump in speed.
+            flightDuration = Mathf.Max(.2f, owner.GetFlightTime(catchable.ballType, Time.timeAsDouble) *
+                Random.Range(1 - owner.speedVariance, 1 + owner.speedVariance));
             if (isKinoBonus && owner.round)
             {
                 for (int i = 0; i < owner.round.State.UniqueCount; i++)

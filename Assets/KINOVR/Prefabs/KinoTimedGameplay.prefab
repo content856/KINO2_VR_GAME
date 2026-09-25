@@ -7525,7 +7525,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2e6012df11018a84e9b559db00b0ba73, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::KinoVR.KinoRoundController
-  roundDuration: 60
+  roundDuration: 45
   startAutomatically: 0
   enableMainSpecialBalls: 1
   catchFeedback: {fileID: 4069432944503056819}
@@ -45033,6 +45033,10 @@ MonoBehaviour:
   maxSpawnInterval: 1.2
   tubeRiseTime: 1.8
   flightTime: 2.6
+  moreWinsFlightTime: 2.1
+  mysteryFlightTime: 1.8
+  boostStartFlightTime: 2
+  boostEndFlightTime: 1.5
   speedVariance: 0.12
   exitAcceleration: 28
   turbulence: 0.35

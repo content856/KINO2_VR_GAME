@@ -32,7 +32,6 @@ namespace KinoVR.Editor
                 if (!flow) flow = root.AddComponent<KinoExperienceController>();
                 flow.round = round; round.experience = flow;
                 round.startAutomatically = false; round.showcaseBoostAfterSecondChance = false;
-                round.roundDuration = Mathf.Clamp(round.roundDuration, 60, 90);
                 if (round.launcher) round.launcher.autoStart = false;
                 if (!flow.contentCanvas) BuildPresentation(flow, font, allwyn, kino);
                 if (flow.allwynLogo.texture != allwyn) flow.brandingSeconds = 3;

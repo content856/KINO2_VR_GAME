@@ -5,7 +5,7 @@ namespace KinoVR
 {
     public sealed class KinoRoundController : MonoBehaviour
     {
-        [Min(1)] public float roundDuration = 60;
+        [Min(1)] public float roundDuration = 45;
         public bool startAutomatically = true;
         [Header("Main draw: glow and extra Mystery balls")]
         public bool enableMainSpecialBalls = true;
@@ -82,7 +82,7 @@ namespace KinoVR
                     else
                     {
                         if (boostPresentation) boostPresentation.SetBoost(true, true);
-                        if (launcher) launcher.SetPace(1, .72f, .75f);
+                        if (launcher) launcher.SetPace(1, 1, .75f);
                     }
                 }
                 if (!State.IsRunning || (State.Phase == KinoRoundPhase.BoostSettling && State.ResolvedBoostCount == State.BoostLaunchCount && noFlights)) FinishRound();

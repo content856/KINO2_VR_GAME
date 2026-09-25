@@ -252,7 +252,7 @@ namespace KinoVR
                     body.text = "Πιάσε τις μπάλες με τα χέρια σου.\nΚάθε πιάσιμο μετράει!";
                     footer.text = "Μείνε καθιστός και κράτα τα χέρια σου ελεύθερα."; break;
                 case KinoExperienceStage.Gameplay:
-                    SetAudio(1); round.BeginRound(Mathf.Clamp(round.roundDuration, 60, 90)); break;
+                    SetAudio(1); round.BeginRound(); break;
                 case KinoExperienceStage.Finale:
                     title.text = "ΜΠΡΑΒΟ!"; body.text = "ΤΕΛΙΚΟ ΣΚΟΡ\n<size=100><color=#FFD42A>" + Record.score + "</color></size>";
                     footer.text = "Ευχαριστούμε που έπαιξες!"; break;

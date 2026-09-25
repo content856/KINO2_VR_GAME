@@ -23,6 +23,12 @@ public class BallLauncher : MonoBehaviour
     [Header("Difficulty")]
     [Tooltip("Seconds from the tube exit to the hand zone. Lower = faster. Applies to new balls.")]
     [Min(.5f)] public float flightTime = 2.6f;
+    [Tooltip("Flight time for More Wins (+2) and the red KINO Bonus ball.")]
+    [Min(.5f)] public float moreWinsFlightTime = 2.1f;
+    [Min(.5f)] public float mysteryFlightTime = 1.8f;
+    [Tooltip("Boost flight time decreases gradually as the phase progresses. Applies to new balls.")]
+    [Min(.5f)] public float boostStartFlightTime = 2f;
+    [Min(.5f)] public float boostEndFlightTime = 1.5f;
     [Range(0, .5f)] public float speedVariance = .12f;
     [Tooltip("Maximum wind acceleration in m/s². Higher = quicker acceleration towards the player after exiting.")]
     [Range(4, 60)] public float exitAcceleration = 28;
@@ -50,6 +56,22 @@ public class BallLauncher : MonoBehaviour
     public float TubeTimeMultiplier { get; private set; } = 1;
     public float EffectiveFlightTime => flightTime * FlightTimeMultiplier;
     public float EffectiveTubeRiseTime => tubeRiseTime * TubeTimeMultiplier;
+
+    public float GetFlightTime(Catchable.BallType ballType, double now)
+    {
+        float duration = flightTime;
+        if (ballType == Catchable.BallType.MoreWins || ballType == Catchable.BallType.KinoBonus)
+            duration = moreWinsFlightTime;
+        else if (ballType == Catchable.BallType.Mystery)
+            duration = mysteryFlightTime;
+        else if (ballType == Catchable.BallType.KinoBoost)
+        {
+            float progress = round && round.State.PhaseDuration > 0 ?
+                Mathf.Clamp01((float)((now - round.State.PhaseStartedAt) / round.State.PhaseDuration)) : 0;
+            duration = Mathf.Lerp(boostStartFlightTime, boostEndFlightTime, progress);
+        }
+        return Mathf.Max(.5f, duration) * FlightTimeMultiplier;
+    }
 
     public void SetPace(float interval, float flight, float tube)
     {
