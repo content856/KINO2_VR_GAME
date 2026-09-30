@@ -72,6 +72,7 @@ namespace KinoVR
         bool initialized, mounted, awaitingTrackedView;
         OVRCameraRig trackedRig;
         KinoModeHands modeHands;
+        KinoFinalePanel finalePanel;
         int lastAnchorFrame = -1;
         float audioMix = 1;
         double clock;
@@ -87,6 +88,16 @@ namespace KinoVR
             round.startAutomatically = false;
             round.showcaseBoostAfterSecondChance = false;
             round.onRoundFinished.AddListener(FinishSessionRound);
+            if (contentCanvas)
+            {
+                var panel = new GameObject("Final score panel", typeof(RectTransform), typeof(KinoFinalePanel));
+                panel.transform.SetParent(contentCanvas.transform, false);
+                panel.transform.SetAsFirstSibling();
+                finalePanel = panel.GetComponent<KinoFinalePanel>();
+                finalePanel.rectTransform.sizeDelta = new Vector2(960, 630);
+                finalePanel.raycastTarget = false;
+                panel.SetActive(false);
+            }
             SetBlackout(1);
             if (content) content.alpha = 0;
         }
@@ -227,8 +238,9 @@ namespace KinoVR
             allwynLogo.rectTransform.anchoredPosition = Vector2.zero;
             allwynLogo.rectTransform.sizeDelta = new Vector2(600, 600f * allwynLogo.texture.height / allwynLogo.texture.width);
             bool finale = Stage == KinoExperienceStage.Finale;
+            if (finalePanel) finalePanel.gameObject.SetActive(finale);
             kinoLogo.rectTransform.anchoredPosition = new Vector2(0, finale ? 235 : 0);
-            float logoWidth = finale ? 160 : 540;
+            float logoWidth = finale ? 180 : 540;
             kinoLogo.rectTransform.sizeDelta = new Vector2(logoWidth, logoWidth * kinoLogo.texture.height / kinoLogo.texture.width);
             title.rectTransform.anchoredPosition = new Vector2(0, finale ? 110 : 225);
             body.rectTransform.anchoredPosition = new Vector2(0, finale ? -65 : -5);
@@ -254,7 +266,7 @@ namespace KinoVR
                 case KinoExperienceStage.Gameplay:
                     SetAudio(1); round.BeginRound(); break;
                 case KinoExperienceStage.Finale:
-                    title.text = "ΜΠΡΑΒΟ!"; body.text = "ΤΕΛΙΚΟ ΣΚΟΡ\n<size=100><color=#FFD42A>" + Record.score + "</color></size>";
+                    title.text = "ΜΠΡΑΒΟ!"; body.text = "ΤΕΛΙΚΟ ΣΚΟΡ\n<size=124><color=#FFD42A>" + Record.score + "</color></size>";
                     footer.text = "Ευχαριστούμε που έπαιξες!"; break;
                 case KinoExperienceStage.Closing:
                     title.text = "Η ΕΜΠΕΙΡΙΑ ΟΛΟΚΛΗΡΩΘΗΚΕ";
