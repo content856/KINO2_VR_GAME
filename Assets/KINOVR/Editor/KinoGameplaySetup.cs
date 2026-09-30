@@ -141,6 +141,7 @@ namespace KinoVR.Editor
                 SceneManager.MoveGameObjectToScene(rig, scene);
                 rig.transform.SetParent(root.transform, false);
                 rig.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+                KinoHandStyleSetup.Configure(rig);
                 view.vrRig = rig;
                 view.head = rig.GetComponent<OVRCameraRig>().centerEyeAnchor;
                 rig.SetActive(false); // Activated by KinoPlayerView before gameplay starts on headset.

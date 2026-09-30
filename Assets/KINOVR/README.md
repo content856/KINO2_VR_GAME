@@ -49,6 +49,14 @@ The live display adds slowly travelling cyan light around the number frame, soft
 
 The first-pass bank includes baked tube rise/exit/approach effects, four catch families, floor taps, phase announcements, final/restart/countdown cues, courtyard breeze, stylized birds, a lottery motor and Boost music. `Tools > KINO VR > Audio` exposes setup, clip replacement, mix controls and playback/sequence validation. All generation happens offline in `Tools/KinoAudio/bake_audio.py`; no audio is synthesized at startup or during Play. See `Tools/KinoAudio/README.md` for the cue list, listening reel, replacement workflow and performance checks.
 
+## Tracked hand appearance
+
+The two catching hands in `KinoTimedGameplay.prefab` share `Materials/HandSatin.mat`, using `KINO/Hand Satin`: midnight blue satin, a broad cool highlight, champagne gold reflections and a restrained cyan edge. The palette follows the Rotunda's blue marble/brass and the Allwyn/display cyan. The opaque surface retains finger depth and silhouette without a transparent overlay. Room probes influence the body lightly, while the stylized highlights keep hands readable over the black instruction screens. The existing instruction-screen helper preserves this material while changing its draw queue, then restores it for gameplay; Meta continues to control tracking visibility and its system-gesture material.
+
+Adjust **Midnight blue satin**, **Gold reflection strength** and **Cyan edge brightness** on `HandSatin.mat`. **Edge breathing amount** defaults to only 4.5%; set it or **Edge breathing cycles per second** to zero for a still finish. The shader has no textures, cubemap sampling or additional realtime lights, with one colour pass and optional URP depth/normal passes. It includes stereo instancing support; headset appearance and performance still need Quest verification.
+
+`Tools > KINO VR > Hands` applies the material, validates both hand assignments and the instruction/gameplay material restoration, and captures previews using Meta's OpenXR reference hand meshes. Reports and renders are saved under `Artifacts/KinoGameplay/Hands`. The gameplay setup also applies this hand style when regenerating the rig. Preview meshes are temporary and are never saved into the scene.
+
 ## Assets and checks
 
 - `Prefabs/KinoTimedGameplay.prefab`: connected gameplay setup for the Rotunda scene.
