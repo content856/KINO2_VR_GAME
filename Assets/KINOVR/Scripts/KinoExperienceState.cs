@@ -2,7 +2,7 @@ using System;
 
 namespace KinoVR
 {
-    public enum KinoExperienceStage { Waiting, ModeSelection, Startup, Safety, Branding, Introduction, Gameplay, SecondChance, Boost, Finale, Closing, Complete }
+    public enum KinoExperienceStage { Waiting, ModeSelection, Startup, Safety, Branding, Introduction, Gameplay, SecondChance, Boost, Finale, Closing, Complete, ResultPause }
 
     // Session clock is independent of ball scoring and uses elapsed, unscaled time.
     public sealed class KinoExperienceState
@@ -21,7 +21,7 @@ namespace KinoVR
             return true;
         }
         public bool Advance(double now, float startup, float safety, float branding, float introduction,
-            float finale, float closing, bool requireConfirmation)
+            float finale, float closing, bool requireConfirmation, float resultPause = 1.5f)
         {
             double elapsed = Math.Max(0, now - EnteredAt);
             switch (Stage)
@@ -32,6 +32,7 @@ namespace KinoVR
                     break;
                 case KinoExperienceStage.Branding: if (elapsed >= branding) return Enter(KinoExperienceStage.Introduction, now); break;
                 case KinoExperienceStage.Introduction: if (elapsed >= introduction) return Enter(KinoExperienceStage.Gameplay, now); break;
+                case KinoExperienceStage.ResultPause: if (elapsed >= resultPause) return Enter(KinoExperienceStage.Finale, now); break;
                 case KinoExperienceStage.Finale: if (elapsed >= finale) return Enter(KinoExperienceStage.Closing, now); break;
                 case KinoExperienceStage.Closing: if (elapsed >= closing) return Enter(KinoExperienceStage.Complete, now); break;
             }
@@ -39,7 +40,7 @@ namespace KinoVR
         }
         public bool BeginSecondChance(double now) => Stage == KinoExperienceStage.Gameplay && Enter(KinoExperienceStage.SecondChance, now);
         public bool BeginBoost(double now) => IncludeBoost && Stage == KinoExperienceStage.SecondChance && Enter(KinoExperienceStage.Boost, now);
-        public bool Finish(double now) => (Stage == KinoExperienceStage.SecondChance || Stage == KinoExperienceStage.Boost) && Enter(KinoExperienceStage.Finale, now);
+        public bool Finish(double now) => (Stage == KinoExperienceStage.SecondChance || Stage == KinoExperienceStage.Boost) && Enter(KinoExperienceStage.ResultPause, now);
         bool Enter(KinoExperienceStage stage, double now) { Stage = stage; EnteredAt = now; return true; }
     }
 }

@@ -7819,12 +7819,13 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::KinoVR.KinoExperienceController
   round: {fileID: 8820980647770196272}
-  startupSeconds: 1.2
+  startupSeconds: 3
   safetySeconds: 12
   brandingSeconds: 3
   logoBlackSeconds: 0.5
   logoFadeSeconds: 0.65
   introductionSeconds: 6
+  resultPauseSeconds: 1.5
   finaleSeconds: 10
   closingSeconds: 5
   safetyVersion: placeholder-v1

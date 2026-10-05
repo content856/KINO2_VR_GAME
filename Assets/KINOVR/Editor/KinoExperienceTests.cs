@@ -16,7 +16,7 @@ namespace KinoVR.Editor
     public static class KinoExperienceTests
     {
         const string Key = "KINO.ExperienceTest";
-        static double deadline, inputDeadline, closingClock, closingRealtime, menuReturnedAt;
+        static double deadline, inputDeadline, resultPauseClock, resultPauseRealtime, closingClock, closingRealtime, menuReturnedAt;
         static bool started, inputSent, handMoved, remountPending, completionPending, completionVerified;
         static float completedBlackout, completedAudio;
         static int run, results, closed, completedLiveScore;
@@ -50,7 +50,7 @@ namespace KinoVR.Editor
         public static void ValidateState()
         {
             var state = new KinoExperienceState();
-            bool Advance(double now, bool external = false) => state.Advance(now, 1, 12, 5, 6, 10, 6, external);
+            bool Advance(double now, bool external = false, float resultPause = 1.5f) => state.Advance(now, 1, 12, 5, 6, 10, 6, external, resultPause);
             Check(!state.ConfirmSafety() && !state.BeginBoost(0), "Input accepted before a session.");
             state.SelectMode(0);
             Check(state.Stage == KinoExperienceStage.ModeSelection && !Advance(1000), "Mode selection started automatically.");
@@ -68,10 +68,13 @@ namespace KinoVR.Editor
             Check(!Advance(1000), "Session timer ended live gameplay.");
             Check(state.BeginSecondChance(112) && !state.BeginSecondChance(113), "Second Chance repeats.");
             Check(!state.BeginBoost(114), "Normal mode entered Boost.");
-            Check(state.Finish(120) && !state.Finish(121), "Finale repeats.");
-            Check(Advance(130) && state.Stage == KinoExperienceStage.Closing, "Closing missing.");
-            Check(!Advance(135.9), "Closing cut short.");
-            Check(Advance(136) && state.Stage == KinoExperienceStage.Complete && !Advance(999), "Complete not terminal.");
+            Check(state.Finish(120) && state.Stage == KinoExperienceStage.ResultPause && !state.Finish(121), "Result pause missing or repeated.");
+            Check(!Advance(121.49), "Final score appeared before the empty-board pause elapsed.");
+            Check(Advance(121.5) && state.Stage == KinoExperienceStage.Finale, "Final score did not follow the empty-board pause.");
+            Check(!Advance(131.49), "Result pause shortened the final score display.");
+            Check(Advance(131.5) && state.Stage == KinoExperienceStage.Closing, "Closing missing.");
+            Check(!Advance(137.4), "Closing cut short.");
+            Check(Advance(137.5) && state.Stage == KinoExperienceStage.Complete && !Advance(999), "Complete not terminal.");
 
             state.Reset(200); state.SelectMode(200); state.Begin(201, true); Advance(202);
             Check(state.IncludeBoost && !state.ExternalConfirmation && !Advance(213.99), "Mode, confirmation or time leaked.");
@@ -79,12 +82,15 @@ namespace KinoVR.Editor
             Advance(219); Advance(225);
             Check(state.BeginSecondChance(226) && state.BeginBoost(227) && !state.BeginBoost(228), "Selected Boost missing or repeated.");
             Check(state.Stage == KinoExperienceStage.Boost && !Advance(1000), "Timed screens ended live Boost.");
-            Check(state.Finish(1001) && state.Stage == KinoExperienceStage.Finale, "Boost did not lead to Finale.");
+            Check(state.Finish(1001) && state.Stage == KinoExperienceStage.ResultPause, "Boost did not lead to an empty-board pause.");
+            Check(!Advance(1002.49) && Advance(1002.5) && state.Stage == KinoExperienceStage.Finale, "Boost result pause timing failed.");
             state.Reset(1010);
             Check(!state.IncludeBoost && !state.ExternalConfirmation, "Reset retained mode or consent.");
             // No caught number is eligible for Boost in an empty round; finishing after the greens is valid.
             state.Begin(1010, true); Advance(1011); Advance(1023); Advance(1028); Advance(1034);
             Check(state.BeginSecondChance(1035) && state.Finish(1036), "Empty eligible Boost set cannot finish normally.");
+            Check(!Advance(1038.99, false, 3) && Advance(1039, false, 3) && state.Stage == KinoExperienceStage.Finale,
+                "Configured result pause duration was ignored.");
         }
 
         [MenuItem("Tools/KINO VR/Experience/3 - Test and capture sessions")]
@@ -146,7 +152,8 @@ namespace KinoVR.Editor
         static void PrepareRun(int index)
         {
             run = index; inputSent = handMoved = false; currentSession = null;
-            completionPending = completionVerified = false; closingClock = closingRealtime = menuReturnedAt = -1;
+            completionPending = completionVerified = false;
+            resultPauseClock = resultPauseRealtime = closingClock = closingRealtime = menuReturnedAt = -1;
             visited.Clear(); phases.Clear(); captured.Clear(); previous = KinoExperienceStage.Waiting;
             inputDeadline = EditorApplication.timeSinceStartup + 10;
         }
@@ -159,6 +166,7 @@ namespace KinoVR.Editor
             flow.startupSeconds = 1; flow.safetySeconds = 2;
             flow.brandingSeconds = 1.6f; flow.logoBlackSeconds = .7f; flow.logoFadeSeconds = .35f;
             flow.introductionSeconds = 2; flow.finaleSeconds = 2;
+            flow.resultPauseSeconds = 1.5f;
             Check(Mathf.Abs(flow.closingSeconds - 5) < .001f, "Closing instruction must retain its five real-second duration.");
             flow.round.showcaseBoostDuration = 4; flow.round.showcaseBoostInterval = .5f;
             flow.onResultReady.AddListener(json =>
@@ -168,6 +176,11 @@ namespace KinoVR.Editor
                 Check(record.sessionId == currentSession && record.includeBoost == (run == 1), "Wrong result session/mode.");
                 Check(record.score == flow.round.State.Score && record.boostCatches == flow.round.State.BoostCatchCount,
                     "Result event did not include the final Boost score.");
+                Check(flow.Stage == KinoExperienceStage.ResultPause && flow.content.alpha == 0,
+                    "Final score appeared immediately when the round finished.");
+                ValidateEmptyBoard(flow);
+                resultPauseClock = flow.State.EnteredAt;
+                resultPauseRealtime = Time.realtimeSinceStartupAsDouble;
             });
             flow.onSessionClosed.AddListener(() =>
             {
@@ -211,6 +224,11 @@ namespace KinoVR.Editor
                 Check(!flow.round.restartButton.IsVisible, "Player restart visible in guided session.");
                 if (flow.Stage == KinoExperienceStage.ModeSelection) { SelectMode(flow); return; }
                 if (currentSession == null) VerifySelectedMode(flow);
+                if (flow.Stage == KinoExperienceStage.ResultPause || flow.Stage == KinoExperienceStage.Finale)
+                    ValidateEmptyBoard(flow);
+                if (flow.Stage == KinoExperienceStage.ResultPause)
+                    Check(flow.content.alpha == 0 && flow.enclosure.BackgroundAlpha == 0 && flow.BlackoutAlpha == 0,
+                        "Empty-board pause is obscured by a screen or blackout.");
                 Check(flow.State.IncludeBoost == (run == 1) && flow.round.showcaseBoostAfterSecondChance == (run == 1), "Selected mode changed.");
                 Check(!flow.normalModeButton.CanPress && !flow.boostModeButton.CanPress, "Mode controls active during a session.");
                 if (run == 0) Check(flow.round.State.BoostLaunchCount == 0 && flow.Stage != KinoExperienceStage.Boost, "Normal mode entered Boost.");
@@ -253,6 +271,13 @@ namespace KinoVR.Editor
             previous = flow.Stage; visited.Add(previous);
             Debug.Log("[Experience test] " + (run == 0 ? "Normal: " : "Boost: ") + previous);
             ValidateWorldCanvas(flow);
+            if (flow.Stage == KinoExperienceStage.Finale)
+            {
+                Check(resultPauseClock >= 0 && flow.State.EnteredAt - resultPauseClock >= flow.resultPauseSeconds - .001,
+                    "Final score appeared before the result pause elapsed.");
+                Check(Time.realtimeSinceStartupAsDouble - resultPauseRealtime >= flow.resultPauseSeconds - .1,
+                    "Empty-board pause was accelerated by gameplay timeScale.");
+            }
             if (flow.Stage == KinoExperienceStage.Closing)
             {
                 closingClock = flow.State.EnteredAt;
@@ -440,7 +465,12 @@ namespace KinoVR.Editor
                 Check(flow.Stage == KinoExperienceStage.ModeSelection, "Mode button bypassed its arming delay.");
                 return;
             }
-            if (run == 0) { choice.button.onClick.Invoke(); inputSent = true; return; }
+            if (run == 0)
+            {
+                choice.button.onClick.Invoke(); inputSent = true;
+                ValidateStartupLogo(flow);
+                return;
+            }
             if (!hand)
             {
                 hand = new GameObject("Experience mode physical hand");
@@ -460,6 +490,8 @@ namespace KinoVR.Editor
         static void VerifySelectedMode(KinoExperienceController flow)
         {
             Check(inputSent && flow.Stage == KinoExperienceStage.Startup && flow.Record != null, "Session bypassed mode selection.");
+            ValidateStartupLogo(flow);
+            CaptureOnce(flow, "Startup-KINO");
             currentSession = flow.Record.sessionId;
             Check(currentSession != completedSession && flow.Record.includeBoost == (run == 1) && flow.Record.score == 0 && flow.Record.boostCatches == 0,
                 "New session retained a result or selected the wrong mode.");
@@ -493,6 +525,27 @@ namespace KinoVR.Editor
 
         static float VisibleAlpha(RawImage logo, CanvasGroup group) =>
             logo.gameObject.activeInHierarchy ? logo.color.a * group.alpha : 0;
+
+        static void ValidateStartupLogo(KinoExperienceController flow)
+        {
+            Check(flow.Stage == KinoExperienceStage.Startup && VisibleAlpha(flow.kinoLogo, flow.content) > .99f &&
+                VisibleAlpha(flow.allwynLogo, flow.content) < .001f, "Mode selection did not immediately show only the KINO logo.");
+            Check(flow.kinoLogo.rectTransform.anchoredPosition.sqrMagnitude < .01f &&
+                flow.enclosure.BackgroundAlpha > .99f && flow.BlackoutAlpha < .01f,
+                "Initial KINO logo is not centered and visible on opaque black.");
+            Check(flow.title.text == "" && flow.body.text == "" && flow.footer.text == "", "Initial KINO logo has extra screen text.");
+        }
+
+        static void ValidateEmptyBoard(KinoExperienceController flow)
+        {
+            Check(flow.round.board && flow.round.board.caughtMarkers.Any(marker => marker), "Missing caught-number markers.");
+            Check(flow.round.board.caughtMarkers.All(marker => !marker || !marker.activeSelf),
+                "Caught-number balls remain on the board after the round.");
+            Check(flow.round.board.multiplierLabels.All(label => !label || !label.gameObject.activeSelf),
+                "Caught-number multipliers remain on the empty board.");
+            Check(flow.Record.score == flow.round.State.Score && flow.Record.score == flow.round.score.CurrentScore,
+                "Clearing the board changed the final score.");
+        }
 
         static void ValidateEnclosureViews(KinoExperienceController flow)
         {
@@ -623,12 +676,13 @@ namespace KinoVR.Editor
                 KinoExperienceStage.Safety, KinoExperienceStage.Branding, KinoExperienceStage.Introduction,
                 KinoExperienceStage.Gameplay, KinoExperienceStage.SecondChance };
             if (run == 1) expected.Add(KinoExperienceStage.Boost);
-            expected.AddRange(new[] { KinoExperienceStage.Finale, KinoExperienceStage.Closing, KinoExperienceStage.Complete });
+            expected.AddRange(new[] { KinoExperienceStage.ResultPause, KinoExperienceStage.Finale, KinoExperienceStage.Closing, KinoExperienceStage.Complete });
             Check(visited.SequenceEqual(expected), "Session order changed: " + string.Join(",", visited));
             foreach (var phase in new[] { KinoRoundPhase.Main, KinoRoundPhase.Bonus, KinoRoundPhase.BoardHold, KinoRoundPhase.FadeOut,
                 KinoRoundPhase.SecondChanceReveal, KinoRoundPhase.SecondChance }) Check(phases.Contains(phase), "Round phase missing: " + phase);
             foreach (var frame in new[] { "Branding-Allwyn", "Branding-Black", "Branding-KINO" })
                 Check(captured.Contains(frame), "Brand frame was not observable: " + frame);
+            Check(captured.Contains("Startup-KINO") && captured.Contains("ResultPause"), "Initial KINO logo or empty-board pause was not observed.");
             Check(captured.Contains("Enclosure-360"), "360-degree opaque instruction enclosure was not verified.");
             Check(results == run + 1 && closed == run + 1, "Result or close event repeated/missing.");
             Check(flow.Record.externalConfirmationUtc == null && flow.Record.safetyElapsedUtc != null, "Timed safety mislabeled.");
@@ -662,10 +716,12 @@ namespace KinoVR.Editor
         {
             File.WriteAllText(KinoExperienceSetup.Output + "/play-test.txt",
                 "PASS: Normal click and Boost physical hand selection; debounce and duplicate-selection guards; no early balls; " +
-                "both complete session orders; Allwyn -> black -> KINO with exclusive centered logos on black; world-space screens at 2.5m; " +
+                "immediate centered KINO logo after both choices; both complete session orders; " +
+                "Allwyn -> black -> KINO with exclusive centered logos on black; world-space screens at 2.5m; " +
                 "20 numbered catches including 2-6 glow + 2-6 extra Mystery + red bonus + 3 green catches per run; " +
                 "live special appearance, material and halo reset; contact popup value/location and duplicate guards; " +
                 "Normal skips Boost; selected Boost follows all greens and adds +3 per catch; " +
+                "empty board before and during final score; result pause uses real seconds and preserves score; " +
                 "one result/close event per session; result mode and Boost score; safety record semantics; text fit; " +
                 "floor-bound 360-degree enclosure at world origin; opaque instruction pixels verified at yaw 90/180/270 and straight up/down; " +
                 "black/silent completion; five real-second closing instruction; automatic menu return with unchanged records/events; " +

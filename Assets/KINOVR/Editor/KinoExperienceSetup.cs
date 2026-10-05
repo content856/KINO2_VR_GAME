@@ -39,6 +39,8 @@ namespace KinoVR.Editor
                 flow.allwynLogo.texture = allwyn;
                 if (!flow.modeCanvas) BuildModeSelection(flow, font);
                 flow.enclosure = ConfigureEnclosure(root);
+                flow.startupSeconds = 3;
+                flow.resultPauseSeconds = 1.5f;
                 flow.closingSeconds = 5;
                 RemoveChild(flow.contentCanvas.transform, "Quiet background");
                 RemoveChild(root.transform, "Session blackout");
@@ -267,12 +269,13 @@ namespace KinoVR.Editor
             Require(!ShaderUtil.ShaderHasError(flow.enclosure.fadeMaterial.shader), "Enclosure shader error.");
             Require(flow.closingSeconds == 5 && round.secondChancePresentation.enclosure == flow.enclosure && round.secondChancePresentation.announcementCanvas,
                 "Missing automatic reset timing or spherical Second Chance presentation.");
+            Require(flow.startupSeconds > 0 && flow.resultPauseSeconds > 0, "Missing opening logo or empty-board pause duration.");
             Require(flow.contentCanvas.renderMode == RenderMode.WorldSpace && flow.modeCanvas && flow.normalModeButton && flow.boostModeButton, "Missing VR mode selection.");
             Require(flow.body.font.HasCharacters(flow.safetyText, out uint[] missing, true, false), "Missing Greek safety glyphs.");
             KinoExperienceTests.ValidateState();
             KinoSecondChanceTests.ValidateRules();
             Directory.CreateDirectory(Output);
-            File.WriteAllText(Output + "/validation.txt", "PASS: session references, supplied logos, Greek text, startup guards, Normal/Boost selection, 360-degree background/fades, five-second closing, flow and round rules.\n");
+            File.WriteAllText(Output + "/validation.txt", "PASS: session references, supplied logos, Greek text, startup guards, Normal/Boost selection, opening logo and empty-board pause timing, 360-degree background/fades, five-second closing, flow and round rules.\n");
         }
         static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
         public static void ApplyBatch() { Apply(); }

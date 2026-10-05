@@ -25,7 +25,8 @@ namespace KinoVR
     {
         public KinoRoundController round;
         [Header("Session timing (seconds)")]
-        [Min(.1f)] public float startupSeconds = 1.2f;
+        [Tooltip("KINO logo shown immediately after choosing Normal or Boost.")]
+        [Min(.1f)] public float startupSeconds = 3;
         [Min(1)] public float safetySeconds = 12;
         [Tooltip("Duration of EACH logo, including its fade in/out.")]
         [Min(1)] public float brandingSeconds = 3;
@@ -33,6 +34,8 @@ namespace KinoVR
         [Min(.1f)] public float logoFadeSeconds = .65f;
         public float BrandingDuration => 2 * brandingSeconds + logoBlackSeconds;
         [Min(1)] public float introductionSeconds = 6;
+        [Tooltip("Time to show the cleared board before revealing the final score.")]
+        [Min(.1f)] public float resultPauseSeconds = 1.5f;
         [Min(1)] public float finaleSeconds = 10;
         [Tooltip("Time from showing the removal instruction until the next visitor's mode selection.")]
         [Min(2)] public float closingSeconds = 5;
@@ -209,7 +212,7 @@ namespace KinoVR
                 round.State.Phase == KinoRoundPhase.BoostSettling) && State.BeginBoost(clock)) PresentStage();
             var previous = Stage;
             if (State.Advance(clock, startupSeconds, safetySeconds, BrandingDuration, introductionSeconds,
-                finaleSeconds, closingSeconds, requireExternalSafetyConfirmation))
+                finaleSeconds, closingSeconds, requireExternalSafetyConfirmation, resultPauseSeconds))
             {
                 if (previous == KinoExperienceStage.Safety) { Record.safetyElapsedUtc = Utc; SaveRecord(); }
                 PresentStage();
@@ -228,13 +231,14 @@ namespace KinoVR
             Record.boostCatches = round.State.BoostCatchCount;
             Record.completedUtc = Utc;
             SaveRecord();
+            if (round.board) round.board.ResetBoard();
             PresentStage();
             onResultReady.Invoke(JsonUtility.ToJson(Record));
         }
         void PresentStage()
         {
             if (!content) return;
-            bool overlay = Stage == KinoExperienceStage.ModeSelection || Stage == KinoExperienceStage.Safety || Stage == KinoExperienceStage.Branding ||
+            bool overlay = Stage == KinoExperienceStage.ModeSelection || Stage == KinoExperienceStage.Startup || Stage == KinoExperienceStage.Safety || Stage == KinoExperienceStage.Branding ||
                 Stage == KinoExperienceStage.Introduction || Stage == KinoExperienceStage.Finale || Stage == KinoExperienceStage.Closing;
             content.alpha = overlay ? 1 : 0;
             ApplyBackground();
@@ -246,7 +250,8 @@ namespace KinoVR
                 else { normalModeButton.Hide(); boostModeButton.Hide(); }
             }
             allwynLogo.gameObject.SetActive(false);
-            kinoLogo.gameObject.SetActive(Stage == KinoExperienceStage.Finale);
+            kinoLogo.gameObject.SetActive(Stage == KinoExperienceStage.Startup || Stage == KinoExperienceStage.Finale);
+            kinoLogo.transform.localScale = Vector3.one;
             allwynLogo.color = kinoLogo.color = Color.white;
             title.color = Color.white;
             body.color = Color.white;
@@ -283,7 +288,7 @@ namespace KinoVR
                     title.text = "ΕΠΙΛΕΞΕ ΕΜΠΕΙΡΙΑ";
                     body.text = "Άγγιξε μία επιλογή για να ξεκινήσεις.";
                     break;
-                case KinoExperienceStage.Startup: SetBlackout(1); SetAudio(0); break;
+                case KinoExperienceStage.Startup: SetBlackout(0); SetAudio(0); break;
                 case KinoExperienceStage.Safety:
                     title.text = "ΠΡΙΝ ΞΕΚΙΝΗΣΟΥΜΕ"; body.text = safetyText;
                     footer.text = placeholderSafety ? "ΠΡΟΣΩΡΙΝΟ ΚΕΙΜΕΝΟ • ΠΡΟΣ ΑΝΤΙΚΑΤΑΣΤΑΣΗ" : "";
@@ -311,7 +316,13 @@ namespace KinoVR
             ApplyBackground();
             float elapsed = (float)(clock - State.EnteredAt);
             if (Stage == KinoExperienceStage.Safety) SetBlackout(1 - Mathf.SmoothStep(0, 1, elapsed / .8f));
-            else if (Stage != KinoExperienceStage.Startup && Stage != KinoExperienceStage.Complete) SetBlackout(0);
+            else if (Stage != KinoExperienceStage.Complete) SetBlackout(0);
+            if (Stage == KinoExperienceStage.Startup)
+            {
+                // The selection gives immediate visual feedback, then fades to black before safety.
+                float fade = Mathf.Max(.01f, Mathf.Min(logoFadeSeconds, startupSeconds * .45f));
+                kinoLogo.color = new Color(1, 1, 1, Mathf.Clamp01((startupSeconds - elapsed) / fade));
+            }
             if (Stage == KinoExperienceStage.Safety && !placeholderSafety)
                 footer.text = requireExternalSafetyConfirmation && !State.ExternalConfirmation ? "Περιμένουμε επιβεβαίωση από το προσωπικό." : "Η εμπειρία ξεκινά σε λίγο.";
             if (Stage == KinoExperienceStage.Branding)
@@ -347,7 +358,7 @@ namespace KinoVR
         void ApplyBackground()
         {
             if (!enclosure) return;
-            bool instructions = Stage == KinoExperienceStage.ModeSelection || Stage == KinoExperienceStage.Safety ||
+            bool instructions = Stage == KinoExperienceStage.ModeSelection || Stage == KinoExperienceStage.Startup || Stage == KinoExperienceStage.Safety ||
                 Stage == KinoExperienceStage.Branding || Stage == KinoExperienceStage.Introduction;
             float alpha = Stage == KinoExperienceStage.Finale ? 1 - Mathf.Clamp01(finaleBackgroundTransparency / 100) :
                 Stage == KinoExperienceStage.Closing ? 1 - Mathf.Clamp01(closingBackgroundTransparency / 100) : instructions ? 1 : 0;
