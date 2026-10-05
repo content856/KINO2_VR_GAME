@@ -126,7 +126,9 @@ namespace KinoVR.Editor
             Check(round.secondChancePresentation && round.secondChancePresentation.enclosure && round.secondChancePresentation.announcementCanvas && round.secondChancePresentation.announcement, "Missing transition references.");
             Check(round.board.secondChanceMarkerMaterial && round.board.multiplierLabels.All(t => t), "Missing green markers/multiplier labels.");
             Check(!ShaderUtil.ShaderHasError(round.board.secondChanceMarkerMaterial.shader) && !ShaderUtil.ShaderHasError(round.secondChancePresentation.enclosure.fadeMaterial.shader), "Board/fade shader error.");
-            Check(round.secondChancePresentation.announcement.GetComponentInChildren<RawImage>(true).texture, "Missing logo texture.");
+            Check(round.secondChancePresentation.announcement.GetComponentInChildren<KinoSecondChancePanel>(true), "Missing Second Chance frame.");
+            var title = round.secondChancePresentation.announcement.transform.Find("Second chance title");
+            Check(title && title.GetComponent<TMPro.TMP_Text>().font.HasCharacters("ΕΥΚΑΙΡΙΑ"), "Missing Greek Second Chance title.");
             Check(round.restartButton && round.restartButton.round == round && round.restartButton.button &&
                 round.restartButton.pressArea && !round.restartButton.gameObject.activeSelf, "Missing or initially visible restart button.");
         }

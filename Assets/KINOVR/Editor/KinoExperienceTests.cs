@@ -481,7 +481,9 @@ namespace KinoVR.Editor
             Check(Vector3.Distance(offset, new Vector3(0, 0, 2.5f)) < .025f, "Experience screen is not centered 2.5m in front of the player.");
             var rect = ((RectTransform)flow.contentCanvas.transform).rect;
             var scale = flow.contentCanvas.transform.lossyScale;
-            Check(Mathf.Abs(rect.width * scale.x - 2.2f) < .025f && Mathf.Abs(rect.height * scale.y - 1.4f) < .025f,
+            float presentationScale = flow.Stage == KinoExperienceStage.Finale ? 1.3f : 1;
+            Check(Mathf.Abs(rect.width * scale.x - 2.2f * presentationScale) < .025f &&
+                Mathf.Abs(rect.height * scale.y - 1.4f * presentationScale) < .025f,
                 "Experience canvas changed its physical size.");
             Check(flow.enclosure && flow.enclosure.BackgroundRenderer && flow.enclosure.FadeRenderer,
                 "Experience is missing its 360-degree black enclosure.");

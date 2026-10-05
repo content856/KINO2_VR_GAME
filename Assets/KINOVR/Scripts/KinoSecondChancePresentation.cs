@@ -2,8 +2,8 @@ using UnityEngine;
 
 namespace KinoVR
 {
-    // The announcement stays fixed at reading distance while the enclosure hides
-    // the room in every direction. The draw clock also drives its spherical fade.
+    // The announcement stays fixed at reading distance over a dimmed room.
+    // The draw clock still drives the complete spherical transition fade.
     public sealed class KinoSecondChancePresentation : MonoBehaviour
     {
         public KinoPlayerView playerView;
@@ -13,7 +13,7 @@ namespace KinoVR
         public KinoBlackEnclosure enclosure;
         public Canvas announcementCanvas;
         public KinoBoostPresentation roomTreatment;
-        bool blueRoom, revealing;
+        bool secondChanceRoom, revealing;
         public float FadeAlpha { get; private set; }
 
         public void Present(KinoRoundState state, double now)
@@ -23,9 +23,9 @@ namespace KinoVR
             bool active = phase == KinoRoundPhase.SecondChance;
             if (reveal && !revealing) PositionAnnouncement();
             revealing = reveal;
-            if (enclosure) enclosure.SetRoundBackground(reveal ? 1 : 0);
-            bool blue = reveal || active;
-            if (blueRoom != blue) { blueRoom = blue; if (roomTreatment) roomTreatment.SetSecondChanceLighting(blue); }
+            if (enclosure) enclosure.SetRoundBackground(reveal ? .15f : 0);
+            bool green = reveal || active;
+            if (secondChanceRoom != green) { secondChanceRoom = green; if (roomTreatment) roomTreatment.SetSecondChanceLighting(green); }
             if (announcement) announcement.SetActive(reveal);
             if (activeHeader) activeHeader.SetActive(active);
             if (normalBrand) normalBrand.SetActive(!reveal && !active && phase != KinoRoundPhase.Boost && phase != KinoRoundPhase.BoostSettling);
@@ -50,8 +50,8 @@ namespace KinoVR
         }
         public void ResetPresentation()
         {
-            if (blueRoom && roomTreatment) roomTreatment.SetSecondChanceLighting(false);
-            blueRoom = false;
+            if (secondChanceRoom && roomTreatment) roomTreatment.SetSecondChanceLighting(false);
+            secondChanceRoom = false;
             revealing = false;
             if (enclosure) enclosure.SetRoundBackground(0);
             if (announcement) announcement.SetActive(false);

@@ -34,6 +34,7 @@ namespace KinoVR.Editor
                 round.startAutomatically = false; round.showcaseBoostAfterSecondChance = false;
                 if (round.launcher) round.launcher.autoStart = false;
                 if (!flow.contentCanvas) BuildPresentation(flow, font, allwyn, kino);
+                flow.goldScoreMaterial = PrepareGoldText(font);
                 if (flow.allwynLogo.texture != allwyn) flow.brandingSeconds = 3;
                 flow.allwynLogo.texture = allwyn;
                 if (!flow.modeCanvas) BuildModeSelection(flow, font);
@@ -96,6 +97,27 @@ namespace KinoVR.Editor
             importer.SetPlatformTextureSettings(android); importer.SaveAndReimport();
             return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
         }
+        static Material PrepareGoldText(TMP_FontAsset font)
+        {
+            const string path = "Assets/KINOVR/Materials/ExperienceGoldText.mat";
+            var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (!material)
+            {
+                material = new Material(font.material) { name = "ExperienceGoldText" };
+                AssetDatabase.CreateAsset(material, path);
+            }
+            material.SetFloat("_FaceDilate", .12f);
+            material.SetFloat("_OutlineWidth", .055f);
+            material.SetColor("_OutlineColor", new Color(.24f, .105f, .018f, 1));
+            material.EnableKeyword("UNDERLAY_ON");
+            material.SetColor("_UnderlayColor", new Color(.16f, .064f, .009f, .85f));
+            material.SetFloat("_UnderlayOffsetX", .7f);
+            material.SetFloat("_UnderlayOffsetY", -.7f);
+            material.SetFloat("_UnderlayDilate", .1f);
+            material.SetFloat("_UnderlaySoftness", .08f);
+            EditorUtility.SetDirty(material);
+            return material;
+        }
         static void BuildPresentation(KinoExperienceController flow, TMP_FontAsset font, Texture2D allwyn, Texture2D kino)
         {
             var canvas = NewCanvas("Experience screens", flow.transform, new Vector2(1100, 700));
@@ -143,18 +165,42 @@ namespace KinoVR.Editor
         {
             presentation.enclosure = ConfigureEnclosure(presentation.gameObject);
             RemoveChild(presentation.transform, "View blackout");
-            if (presentation.announcementCanvas) return;
             if (!font) font = PrepareFont();
-            if (presentation.announcement) UnityEngine.Object.DestroyImmediate(presentation.announcement);
-            var canvas = NewCanvas("Second Chance reading screen", presentation.transform, new Vector2(1100, 700));
-            canvas.transform.localScale = Vector3.one * .002f;
+            var goldText = PrepareGoldText(font);
+            var canvas = presentation.announcementCanvas;
+            if (!canvas)
+            {
+                if (presentation.announcement) UnityEngine.Object.DestroyImmediate(presentation.announcement);
+                canvas = NewCanvas("Second Chance reading screen", presentation.transform, new Vector2(1100, 700));
+            }
+            // Upgrade existing prefabs too; repeat setup must not accumulate decoration.
+            for (int i = canvas.transform.childCount - 1; i >= 0; i--)
+                UnityEngine.Object.DestroyImmediate(canvas.transform.GetChild(i).gameObject);
+            canvas.transform.localScale = Vector3.one * .00275f;
             canvas.sortingOrder = 100;
             presentation.announcementCanvas = canvas;
             presentation.announcement = canvas.gameObject;
-            var texture = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/KINOVR/Textures/SecondChanceLogo.png");
-            Logo("Second Chance supplied logo", canvas.transform, texture, new Vector2(0, 90), 700);
-            Label("Extra balls", canvas.transform, font, new Vector2(0, -150), new Vector2(1000, 70), 40).text = "3 ΕΠΙΠΛΕΟΝ ΜΠΑΛΕΣ";
-            Label("Triple points", canvas.transform, font, new Vector2(0, -230), new Vector2(1000, 65), 34).text = "x3 ΠΟΝΤΟΙ";
+            var panel = new GameObject("Emerald and gold frame", typeof(RectTransform), typeof(KinoSecondChancePanel));
+            panel.transform.SetParent(canvas.transform, false);
+            Place((RectTransform)panel.transform, Vector2.zero, new Vector2(1020, 550));
+            panel.GetComponent<KinoSecondChancePanel>().raycastTarget = false;
+            var number = Label("Second chance number", canvas.transform, font, new Vector2(-338, 65), new Vector2(155, 180), 146);
+            number.text = "2";
+            KinoScreenTypography.Gold(number, goldText);
+            var ordinal = Label("Second chance ordinal", canvas.transform, font, new Vector2(-264, 111), new Vector2(58, 72), 44);
+            ordinal.text = "η";
+            KinoScreenTypography.Gold(ordinal, goldText);
+            var title = Label("Second chance title", canvas.transform, font, new Vector2(111, 65), new Vector2(644, 150), 90);
+            title.text = "ΕΥΚΑΙΡΙΑ";
+            title.textWrappingMode = TextWrappingModes.NoWrap;
+            KinoScreenTypography.Gold(title, goldText);
+            var extra = Label("Extra balls", canvas.transform, font, new Vector2(0, -142), new Vector2(700, 60), 35);
+            extra.text = "3 ΕΠΙΠΛΕΟΝ ΜΠΑΛΕΣ";
+            extra.color = KinoScreenTypography.Ivory;
+            var points = Label("Triple points", canvas.transform, font, new Vector2(0, -207), new Vector2(650, 60), 37);
+            points.text = "x3 ΠΟΝΤΟΙ";
+            points.fontStyle = FontStyles.Bold;
+            points.color = new Color(.3f, 1, .43f);
             canvas.gameObject.SetActive(false);
         }
         static Canvas NewCanvas(string name, Transform parent, Vector2 size)

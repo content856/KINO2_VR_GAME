@@ -52,6 +52,7 @@ namespace KinoVR
         public CanvasGroup content;
         public TMP_Text title, body, footer;
         public RawImage allwynLogo, kinoLogo;
+        public Material goldScoreMaterial;
         public KinoBlackEnclosure enclosure;
         public float BlackoutAlpha => enclosure ? enclosure.FadeAlpha : 0;
         [Header("Ending background transparency (%)")]
@@ -73,6 +74,7 @@ namespace KinoVR
         OVRCameraRig trackedRig;
         KinoModeHands modeHands;
         KinoFinalePanel finalePanel;
+        Material bodyMaterial;
         int lastAnchorFrame = -1;
         float audioMix = 1;
         double clock;
@@ -80,6 +82,7 @@ namespace KinoVR
 
         void Awake()
         {
+            if (body) bodyMaterial = body.fontSharedMaterial;
             if (!round) round = GetComponent<KinoRoundController>();
             if (!round) { enabled = false; return; }
             round.experience = this;
@@ -94,8 +97,20 @@ namespace KinoVR
                 panel.transform.SetParent(contentCanvas.transform, false);
                 panel.transform.SetAsFirstSibling();
                 finalePanel = panel.GetComponent<KinoFinalePanel>();
-                finalePanel.rectTransform.sizeDelta = new Vector2(960, 630);
+                finalePanel.rectTransform.sizeDelta = new Vector2(760, 720);
                 finalePanel.raycastTarget = false;
+                var caption = new GameObject("Final score caption", typeof(RectTransform), typeof(TextMeshProUGUI)).GetComponent<TextMeshProUGUI>();
+                caption.transform.SetParent(panel.transform, false);
+                caption.rectTransform.anchoredPosition = new Vector2(0, 64);
+                caption.rectTransform.sizeDelta = new Vector2(440, 50);
+                caption.font = body.font;
+                caption.fontSharedMaterial = body.fontSharedMaterial;
+                caption.fontSize = 28;
+                caption.characterSpacing = 4;
+                caption.alignment = TextAlignmentOptions.Center;
+                caption.color = KinoScreenTypography.Ivory;
+                caption.raycastTarget = false;
+                caption.text = "ΤΕΛΙΚΟ ΣΚΟΡ";
                 panel.SetActive(false);
             }
             SetBlackout(1);
@@ -239,12 +254,27 @@ namespace KinoVR
             allwynLogo.rectTransform.sizeDelta = new Vector2(600, 600f * allwynLogo.texture.height / allwynLogo.texture.width);
             bool finale = Stage == KinoExperienceStage.Finale;
             if (finalePanel) finalePanel.gameObject.SetActive(finale);
-            kinoLogo.rectTransform.anchoredPosition = new Vector2(0, finale ? 235 : 0);
-            float logoWidth = finale ? 180 : 540;
+            kinoLogo.rectTransform.anchoredPosition = new Vector2(0, finale ? 255 : 0);
+            float logoWidth = finale ? 260 : 540;
             kinoLogo.rectTransform.sizeDelta = new Vector2(logoWidth, logoWidth * kinoLogo.texture.height / kinoLogo.texture.width);
-            title.rectTransform.anchoredPosition = new Vector2(0, finale ? 110 : 225);
+            title.rectTransform.anchoredPosition = new Vector2(0, finale ? 128 : 225);
+            title.fontSize = finale ? 50 : 48;
+            title.color = finale ? KinoScreenTypography.Ivory : Color.white;
             body.rectTransform.anchoredPosition = new Vector2(0, finale ? -65 : -5);
-            body.rectTransform.sizeDelta = new Vector2(1040, finale ? 230 : 330);
+            body.rectTransform.sizeDelta = finale ? new Vector2(360, 195) : new Vector2(1040, 330);
+            body.fontSize = finale ? 156 : 34;
+            body.fontSizeMax = 156;
+            body.fontSizeMin = 80;
+            body.enableAutoSizing = finale;
+            body.enableVertexGradient = false;
+            body.fontStyle = FontStyles.Normal;
+            body.textWrappingMode = finale ? TextWrappingModes.NoWrap : TextWrappingModes.Normal;
+            if (bodyMaterial) body.fontSharedMaterial = bodyMaterial;
+            if (finale) KinoScreenTypography.Gold(body, goldScoreMaterial);
+            footer.rectTransform.anchoredPosition = new Vector2(0, finale ? -282 : -245);
+            footer.rectTransform.sizeDelta = finale ? new Vector2(550, 64) : new Vector2(1080, 65);
+            footer.fontSize = finale ? 27 : 25;
+            footer.color = finale ? KinoScreenTypography.Ivory : new Color(.68f, .83f, .93f);
             title.text = body.text = footer.text = "";
             switch (Stage)
             {
@@ -266,7 +296,7 @@ namespace KinoVR
                 case KinoExperienceStage.Gameplay:
                     SetAudio(1); round.BeginRound(); break;
                 case KinoExperienceStage.Finale:
-                    title.text = "ΜΠΡΑΒΟ!"; body.text = "ΤΕΛΙΚΟ ΣΚΟΡ\n<size=124><color=#FFD42A>" + Record.score + "</color></size>";
+                    title.text = "ΜΠΡΑΒΟ!"; body.text = Record.score.ToString();
                     footer.text = "Ευχαριστούμε που έπαιξες!"; break;
                 case KinoExperienceStage.Closing:
                     title.text = "Η ΕΜΠΕΙΡΙΑ ΟΛΟΚΛΗΡΩΘΗΚΕ";
@@ -331,7 +361,9 @@ namespace KinoVR
             if (forward.sqrMagnitude < .01f) forward = Vector3.forward;
             var heading = Quaternion.LookRotation(forward.normalized);
             contentCanvas.transform.SetPositionAndRotation(view.position + heading * new Vector3(0, 0, contentDistance), heading);
-            contentCanvas.transform.localScale = Vector3.one * (contentWidth / 1100);
+            float scale = contentWidth / 1100;
+            if (Stage == KinoExperienceStage.Finale) scale *= 1.3f;
+            contentCanvas.transform.localScale = Vector3.one * scale;
             contentCanvas.worldCamera = view.GetComponent<Camera>();
         }
         void PositionModeSelection()
