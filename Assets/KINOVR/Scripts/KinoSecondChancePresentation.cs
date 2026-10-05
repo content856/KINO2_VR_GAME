@@ -2,11 +2,12 @@ using UnityEngine;
 
 namespace KinoVR
 {
-    // The announcement stays fixed at reading distance over a dimmed room.
+    // The announcement occupies the board's number field over a dimmed room.
     // The draw clock still drives the complete spherical transition fade.
     public sealed class KinoSecondChancePresentation : MonoBehaviour
     {
         public KinoPlayerView playerView;
+        public KinoNumberBoard board;
         public GameObject announcement;
         public GameObject activeHeader;
         public GameObject normalBrand;
@@ -21,6 +22,7 @@ namespace KinoVR
             var phase = state.Phase;
             bool reveal = phase == KinoRoundPhase.SecondChanceReveal;
             bool active = phase == KinoRoundPhase.SecondChance;
+            if (board) board.SetSecondChanceCover(reveal);
             if (reveal && !revealing) PositionAnnouncement();
             revealing = reveal;
             if (enclosure) enclosure.SetRoundBackground(reveal ? .15f : 0);
@@ -28,7 +30,7 @@ namespace KinoVR
             if (secondChanceRoom != green) { secondChanceRoom = green; if (roomTreatment) roomTreatment.SetSecondChanceLighting(green); }
             if (announcement) announcement.SetActive(reveal);
             if (activeHeader) activeHeader.SetActive(active);
-            if (normalBrand) normalBrand.SetActive(!reveal && !active && phase != KinoRoundPhase.Boost && phase != KinoRoundPhase.BoostSettling);
+            if (normalBrand) normalBrand.SetActive(!active && phase != KinoRoundPhase.Boost && phase != KinoRoundPhase.BoostSettling);
             float elapsed = (float)(now - state.PhaseStartedAt);
             SetFade(phase == KinoRoundPhase.FadeOut ? Mathf.Clamp01(elapsed / KinoRoundState.FadeSeconds) :
                 reveal ? 1 - Mathf.Clamp01(elapsed / KinoRoundState.FadeSeconds) : 0);
@@ -40,19 +42,16 @@ namespace KinoVR
         }
         void PositionAnnouncement()
         {
-            if (!playerView || !playerView.View || !announcementCanvas) return;
-            var view = playerView.View;
-            var forward = Vector3.ProjectOnPlane(view.forward, Vector3.up);
-            if (forward.sqrMagnitude < .01f) forward = Vector3.forward;
-            var heading = Quaternion.LookRotation(forward.normalized);
-            announcementCanvas.transform.SetPositionAndRotation(view.position + heading * new Vector3(0, 0, 2.5f), heading);
-            announcementCanvas.worldCamera = view.GetComponent<Camera>();
+            KinoBoardOverlay.Place(announcementCanvas, board, KinoBoardOverlay.ArtworkSize);
+            if (announcementCanvas && playerView && playerView.View)
+                announcementCanvas.worldCamera = playerView.View.GetComponent<Camera>();
         }
         public void ResetPresentation()
         {
             if (secondChanceRoom && roomTreatment) roomTreatment.SetSecondChanceLighting(false);
             secondChanceRoom = false;
             revealing = false;
+            if (board) board.SetSecondChanceCover(false);
             if (enclosure) enclosure.SetRoundBackground(0);
             if (announcement) announcement.SetActive(false);
             if (activeHeader) activeHeader.SetActive(false);

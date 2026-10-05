@@ -27,11 +27,11 @@ namespace KinoVR
         [Header("Session timing (seconds)")]
         [Min(.1f)] public float startupSeconds = 1.2f;
         [Min(1)] public float safetySeconds = 12;
-        [Tooltip("Duration of EACH logo, including its fade in/out.")]
+        [Tooltip("Duration of the Allwyn introduction, including its fade in/out.")]
         [Min(1)] public float brandingSeconds = 3;
-        [Min(.1f)] public float logoBlackSeconds = .5f;
+        [HideInInspector] public float logoBlackSeconds = .5f;
         [Min(.1f)] public float logoFadeSeconds = .65f;
-        public float BrandingDuration => 2 * brandingSeconds + logoBlackSeconds;
+        public float BrandingDuration => brandingSeconds;
         [Min(1)] public float introductionSeconds = 6;
         [Min(1)] public float finaleSeconds = 10;
         [Tooltip("Time from showing the removal instruction until the next visitor's mode selection.")]
@@ -75,6 +75,7 @@ namespace KinoVR
         KinoModeHands modeHands;
         KinoFinalePanel finalePanel;
         Material bodyMaterial;
+        Transform contentParent;
         int lastAnchorFrame = -1;
         float audioMix = 1;
         double clock;
@@ -93,19 +94,20 @@ namespace KinoVR
             round.onRoundFinished.AddListener(FinishSessionRound);
             if (contentCanvas)
             {
+                contentParent = contentCanvas.transform.parent;
                 var panel = new GameObject("Final score panel", typeof(RectTransform), typeof(KinoFinalePanel));
                 panel.transform.SetParent(contentCanvas.transform, false);
                 panel.transform.SetAsFirstSibling();
                 finalePanel = panel.GetComponent<KinoFinalePanel>();
-                finalePanel.rectTransform.sizeDelta = new Vector2(760, 720);
+                finalePanel.rectTransform.sizeDelta = KinoBoardOverlay.ArtworkSize;
                 finalePanel.raycastTarget = false;
                 var caption = new GameObject("Final score caption", typeof(RectTransform), typeof(TextMeshProUGUI)).GetComponent<TextMeshProUGUI>();
                 caption.transform.SetParent(panel.transform, false);
-                caption.rectTransform.anchoredPosition = new Vector2(0, 64);
+                caption.rectTransform.anchoredPosition = new Vector2(0, 105);
                 caption.rectTransform.sizeDelta = new Vector2(440, 50);
                 caption.font = body.font;
                 caption.fontSharedMaterial = body.fontSharedMaterial;
-                caption.fontSize = 28;
+                caption.fontSize = 31;
                 caption.characterSpacing = 4;
                 caption.alignment = TextAlignmentOptions.Center;
                 caption.color = KinoScreenTypography.Ivory;
@@ -246,21 +248,19 @@ namespace KinoVR
                 else { normalModeButton.Hide(); boostModeButton.Hide(); }
             }
             allwynLogo.gameObject.SetActive(false);
-            kinoLogo.gameObject.SetActive(Stage == KinoExperienceStage.Finale);
+            kinoLogo.gameObject.SetActive(false);
             allwynLogo.color = kinoLogo.color = Color.white;
             title.color = Color.white;
             body.color = Color.white;
             allwynLogo.rectTransform.anchoredPosition = Vector2.zero;
             allwynLogo.rectTransform.sizeDelta = new Vector2(600, 600f * allwynLogo.texture.height / allwynLogo.texture.width);
             bool finale = Stage == KinoExperienceStage.Finale;
+            if (round.board) round.board.SetFinaleCover(finale);
             if (finalePanel) finalePanel.gameObject.SetActive(finale);
-            kinoLogo.rectTransform.anchoredPosition = new Vector2(0, finale ? 255 : 0);
-            float logoWidth = finale ? 260 : 540;
-            kinoLogo.rectTransform.sizeDelta = new Vector2(logoWidth, logoWidth * kinoLogo.texture.height / kinoLogo.texture.width);
-            title.rectTransform.anchoredPosition = new Vector2(0, finale ? 128 : 225);
-            title.fontSize = finale ? 50 : 48;
+            title.rectTransform.anchoredPosition = new Vector2(0, finale ? 165 : 225);
+            title.fontSize = finale ? 52 : 48;
             title.color = finale ? KinoScreenTypography.Ivory : Color.white;
-            body.rectTransform.anchoredPosition = new Vector2(0, finale ? -65 : -5);
+            body.rectTransform.anchoredPosition = new Vector2(0, finale ? -8 : -5);
             body.rectTransform.sizeDelta = finale ? new Vector2(360, 195) : new Vector2(1040, 330);
             body.fontSize = finale ? 156 : 34;
             body.fontSizeMax = 156;
@@ -271,9 +271,9 @@ namespace KinoVR
             body.textWrappingMode = finale ? TextWrappingModes.NoWrap : TextWrappingModes.Normal;
             if (bodyMaterial) body.fontSharedMaterial = bodyMaterial;
             if (finale) KinoScreenTypography.Gold(body, goldScoreMaterial);
-            footer.rectTransform.anchoredPosition = new Vector2(0, finale ? -282 : -245);
-            footer.rectTransform.sizeDelta = finale ? new Vector2(550, 64) : new Vector2(1080, 65);
-            footer.fontSize = finale ? 27 : 25;
+            footer.rectTransform.anchoredPosition = new Vector2(0, finale ? -177 : -245);
+            footer.rectTransform.sizeDelta = finale ? new Vector2(650, 54) : new Vector2(1080, 65);
+            footer.fontSize = finale ? 30 : 25;
             footer.color = finale ? KinoScreenTypography.Ivory : new Color(.68f, .83f, .93f);
             title.text = body.text = footer.text = "";
             switch (Stage)
@@ -332,10 +332,7 @@ namespace KinoVR
             if (Stage == KinoExperienceStage.Finale)
             {
                 content.alpha = Mathf.Clamp01(elapsed / .8f);
-                float pulse = 1 + .025f * Mathf.Sin(elapsed * 2);
-                kinoLogo.transform.localScale = Vector3.one * pulse;
             }
-            else kinoLogo.transform.localScale = Vector3.one;
             if (Stage == KinoExperienceStage.Closing)
             {
                 float fade = Mathf.SmoothStep(0, 1, (elapsed - closingSeconds + .5f) / .5f);
@@ -356,14 +353,22 @@ namespace KinoVR
         void PositionContent()
         {
             var view = round.playerView ? round.playerView.View : null;
-            if (!view || !contentCanvas) return;
+            if (!contentCanvas) return;
+            if (Stage == KinoExperienceStage.Finale)
+            {
+                KinoBoardOverlay.Place(contentCanvas, round.board, KinoBoardOverlay.ArtworkSize);
+                if (view) contentCanvas.worldCamera = view.GetComponent<Camera>();
+                return;
+            }
+            contentCanvas.transform.SetParent(contentParent, false);
+            ((RectTransform)contentCanvas.transform).sizeDelta = new Vector2(1100, 700);
+            contentCanvas.overrideSorting = false;
+            if (!view) return;
             var forward = Vector3.ProjectOnPlane(view.forward, Vector3.up);
             if (forward.sqrMagnitude < .01f) forward = Vector3.forward;
             var heading = Quaternion.LookRotation(forward.normalized);
             contentCanvas.transform.SetPositionAndRotation(view.position + heading * new Vector3(0, 0, contentDistance), heading);
-            float scale = contentWidth / 1100;
-            if (Stage == KinoExperienceStage.Finale) scale *= 1.3f;
-            contentCanvas.transform.localScale = Vector3.one * scale;
+            contentCanvas.transform.localScale = Vector3.one * (contentWidth / 1100);
             contentCanvas.worldCamera = view.GetComponent<Camera>();
         }
         void PositionModeSelection()
@@ -379,18 +384,13 @@ namespace KinoVR
         }
         void AnimateBranding(float elapsed)
         {
-            // Fade only the logo: the background stays fully black between both marks.
+            // KINO is already on the board; only the Allwyn introduction remains.
             content.alpha = 1;
-            float secondStart = brandingSeconds + logoBlackSeconds;
-            bool first = elapsed < brandingSeconds;
-            bool second = elapsed >= secondStart;
-            allwynLogo.gameObject.SetActive(first);
-            kinoLogo.gameObject.SetActive(second);
-            float local = second ? elapsed - secondStart : elapsed;
+            allwynLogo.gameObject.SetActive(elapsed < brandingSeconds);
+            kinoLogo.gameObject.SetActive(false);
             float fade = Mathf.Min(logoFadeSeconds, brandingSeconds * .45f);
-            float alpha = Mathf.Min(Mathf.Clamp01(local / fade), Mathf.Clamp01((brandingSeconds - local) / fade));
-            allwynLogo.color = new Color(1, 1, 1, first ? alpha : 0);
-            kinoLogo.color = new Color(1, 1, 1, second ? alpha : 0);
+            float alpha = Mathf.Min(Mathf.Clamp01(elapsed / fade), Mathf.Clamp01((brandingSeconds - elapsed) / fade));
+            allwynLogo.color = new Color(1, 1, 1, alpha);
         }
         void LateUpdate()
         {
@@ -420,6 +420,7 @@ namespace KinoVR
             if (round.launcher) round.launcher.StopLaunching(true);
             if (round.restartButton) round.restartButton.Hide();
             if (round.secondChancePresentation) round.secondChancePresentation.ResetPresentation();
+            if (round.board) round.board.SetFinaleCover(false);
             if (round.boostPresentation) round.boostPresentation.SetBoost(false);
         }
         void SaveRecord()

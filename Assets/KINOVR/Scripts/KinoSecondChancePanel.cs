@@ -18,7 +18,7 @@ namespace KinoVR
             KinoPanelMesh.RoundedFill(vh, new Rect(-516, -285, 1032, 562), 59,
                 new Color(0, 0, 0, .24f), new Color(0, 0, 0, .24f));
             KinoPanelMesh.RoundedFill(vh, face, 54,
-                new Color(.012f, .04f, .024f, .994f), new Color(.012f, .042f, .033f, .994f));
+                new Color(.012f, .04f, .024f, 1), new Color(.012f, .042f, .033f, 1));
             KinoPanelMesh.Glow(vh, new Vector2(-296, 68), new Vector2(266, 234), new Color(.015f, .48f, .13f, .13f));
             KinoPanelMesh.Glow(vh, new Vector2(0, -269), new Vector2(263, 53), new Color(.11f, 1, .2f, .16f));
             KinoPanelMesh.Glow(vh, new Vector2(0, 270), new Vector2(238, 35), new Color(.14f, 1, .18f, .19f));

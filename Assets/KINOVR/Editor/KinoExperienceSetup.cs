@@ -31,6 +31,7 @@ namespace KinoVR.Editor
                 var flow = root.GetComponent<KinoExperienceController>();
                 if (!flow) flow = root.AddComponent<KinoExperienceController>();
                 flow.round = round; round.experience = flow;
+                ConfigureBoardOverlays(round.board);
                 round.startAutomatically = false; round.showcaseBoostAfterSecondChance = false;
                 if (round.launcher) round.launcher.autoStart = false;
                 if (!flow.contentCanvas) BuildPresentation(flow, font, allwyn, kino);
@@ -163,6 +164,8 @@ namespace KinoVR.Editor
         }
         internal static void ConfigureSecondChanceScreen(KinoSecondChancePresentation presentation, TMP_FontAsset font = null)
         {
+            presentation.board = presentation.GetComponent<KinoRoundController>().board;
+            ConfigureBoardOverlays(presentation.board);
             presentation.enclosure = ConfigureEnclosure(presentation.gameObject);
             RemoveChild(presentation.transform, "View blackout");
             if (!font) font = PrepareFont();
@@ -176,32 +179,60 @@ namespace KinoVR.Editor
             // Upgrade existing prefabs too; repeat setup must not accumulate decoration.
             for (int i = canvas.transform.childCount - 1; i >= 0; i--)
                 UnityEngine.Object.DestroyImmediate(canvas.transform.GetChild(i).gameObject);
-            canvas.transform.localScale = Vector3.one * .00275f;
-            canvas.sortingOrder = 100;
+            KinoBoardOverlay.Place(canvas, presentation.board, KinoBoardOverlay.ArtworkSize);
             presentation.announcementCanvas = canvas;
             presentation.announcement = canvas.gameObject;
             var panel = new GameObject("Emerald and gold frame", typeof(RectTransform), typeof(KinoSecondChancePanel));
             panel.transform.SetParent(canvas.transform, false);
-            Place((RectTransform)panel.transform, Vector2.zero, new Vector2(1020, 550));
+            Place((RectTransform)panel.transform, Vector2.zero, KinoBoardOverlay.ArtworkSize);
             panel.GetComponent<KinoSecondChancePanel>().raycastTarget = false;
-            var number = Label("Second chance number", canvas.transform, font, new Vector2(-338, 65), new Vector2(155, 180), 146);
+            var number = Label("Second chance number", canvas.transform, font, new Vector2(-338, 57), new Vector2(155, 180), 146);
             number.text = "2";
             KinoScreenTypography.Gold(number, goldText);
-            var ordinal = Label("Second chance ordinal", canvas.transform, font, new Vector2(-264, 111), new Vector2(58, 72), 44);
+            var ordinal = Label("Second chance ordinal", canvas.transform, font, new Vector2(-264, 97), new Vector2(58, 72), 44);
             ordinal.text = "η";
             KinoScreenTypography.Gold(ordinal, goldText);
-            var title = Label("Second chance title", canvas.transform, font, new Vector2(111, 65), new Vector2(644, 150), 90);
+            var title = Label("Second chance title", canvas.transform, font, new Vector2(111, 57), new Vector2(644, 150), 90);
             title.text = "ΕΥΚΑΙΡΙΑ";
             title.textWrappingMode = TextWrappingModes.NoWrap;
             KinoScreenTypography.Gold(title, goldText);
-            var extra = Label("Extra balls", canvas.transform, font, new Vector2(0, -142), new Vector2(700, 60), 35);
+            var extra = Label("Extra balls", canvas.transform, font, new Vector2(0, -124), new Vector2(700, 60), 40);
             extra.text = "3 ΕΠΙΠΛΕΟΝ ΜΠΑΛΕΣ";
             extra.color = KinoScreenTypography.Ivory;
-            var points = Label("Triple points", canvas.transform, font, new Vector2(0, -207), new Vector2(650, 60), 37);
+            var points = Label("Triple points", canvas.transform, font, new Vector2(0, -181), new Vector2(650, 60), 41);
             points.text = "x3 ΠΟΝΤΟΙ";
             points.fontStyle = FontStyles.Bold;
             points.color = new Color(.3f, 1, .43f);
             canvas.gameObject.SetActive(false);
+        }
+        static void ConfigureBoardOverlays(KinoNumberBoard board)
+        {
+            board.numberField = board.transform.Find("Live number field") as RectTransform;
+            if (!board.numberGrid)
+            {
+                var group = new GameObject("Number grid content", typeof(RectTransform), typeof(CanvasGroup));
+                group.transform.SetParent(board.transform, false);
+                var rect = (RectTransform)group.transform;
+                rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one;
+                rect.offsetMin = rect.offsetMax = Vector2.zero;
+                board.numberGrid = group.GetComponent<CanvasGroup>();
+                board.numberGrid.blocksRaycasts = false;
+                board.numberGrid.interactable = false;
+            }
+            void Move(Transform child)
+            {
+                if (child && child.parent != board.numberGrid.transform)
+                    child.SetParent(board.numberGrid.transform, true);
+            }
+            // Keep each marker below its number and preserve all existing references/positions.
+            for (int i = 0; i < board.numberLabels.Length; i++)
+            {
+                if (i < board.caughtMarkers.Length && board.caughtMarkers[i]) Move(board.caughtMarkers[i].transform);
+                if (board.numberLabels[i]) Move(board.numberLabels[i].transform);
+            }
+            foreach (var label in board.multiplierLabels) if (label) Move(label.transform);
+            board.SetSecondChanceCover(false);
+            board.SetFinaleCover(false);
         }
         static Canvas NewCanvas(string name, Transform parent, Vector2 size)
         {

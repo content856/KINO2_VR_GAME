@@ -19,6 +19,26 @@ namespace KinoVR
         public Material secondChanceMarkerMaterial;
         public TMP_Text[] multiplierLabels = new TMP_Text[80];
         public Color bonusCaughtColor = Color.white;
+        public RectTransform numberField;
+        public CanvasGroup numberGrid;
+        bool secondChanceCover, finaleCover;
+        public bool NumbersVisible => !secondChanceCover && !finaleCover;
+
+        public void SetSecondChanceCover(bool visible)
+        {
+            secondChanceCover = visible;
+            ApplyNumberVisibility();
+        }
+        public void SetFinaleCover(bool visible)
+        {
+            finaleCover = visible;
+            ApplyNumberVisibility();
+        }
+        void ApplyNumberVisibility()
+        {
+            // Hide the whole grid without losing caught markers or multiplier state.
+            if (numberGrid) numberGrid.alpha = NumbersVisible ? 1 : 0;
+        }
         readonly float[] pulseUntil = new float[80];
         readonly float[] multiplierUntil = new float[80];
         readonly bool[] bonusCaught = new bool[80];
@@ -48,6 +68,8 @@ namespace KinoVR
         }
         public void ResetBoard()
         {
+            secondChanceCover = finaleCover = false;
+            ApplyNumberVisibility();
             for (int i = 0; i < 80; i++)
             {
                 bonusCaught[i] = false;

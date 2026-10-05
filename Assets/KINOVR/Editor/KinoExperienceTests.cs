@@ -206,6 +206,9 @@ namespace KinoVR.Editor
                 if (!started) Initialize(flow);
                 if (completionPending) { VerifyAutomaticReturn(flow); return; }
                 ObserveStage(flow);
+                Check(VisibleAlpha(flow.kinoLogo, flow.content) < .001f,
+                    "A duplicate KINO logo appeared after mode selection or on the final score.");
+                ValidateBoardPresentation(flow);
                 if (flow.Stage < KinoExperienceStage.Gameplay || flow.Stage >= KinoExperienceStage.Finale)
                     Check(!flow.round.IsRunning && flow.round.launcher.ActiveBallCount == 0, "Balls outside gameplay.");
                 Check(!flow.round.restartButton.IsVisible, "Player restart visible in guided session.");
@@ -476,19 +479,66 @@ namespace KinoVR.Editor
             Check(flow.contentCanvas.renderMode == RenderMode.WorldSpace,
                 "Experience uses a non-VR canvas.");
             var view = flow.round.playerView.View;
-            var heading = Quaternion.LookRotation(Vector3.ProjectOnPlane(view.forward, Vector3.up).normalized);
-            var offset = Quaternion.Inverse(heading) * (flow.contentCanvas.transform.position - view.position);
-            Check(Vector3.Distance(offset, new Vector3(0, 0, 2.5f)) < .025f, "Experience screen is not centered 2.5m in front of the player.");
-            var rect = ((RectTransform)flow.contentCanvas.transform).rect;
-            var scale = flow.contentCanvas.transform.lossyScale;
-            float presentationScale = flow.Stage == KinoExperienceStage.Finale ? 1.3f : 1;
-            Check(Mathf.Abs(rect.width * scale.x - 2.2f * presentationScale) < .025f &&
-                Mathf.Abs(rect.height * scale.y - 1.4f * presentationScale) < .025f,
-                "Experience canvas changed its physical size.");
+            if (flow.Stage == KinoExperienceStage.Finale) ValidateBoardOverlay(flow.round, flow.contentCanvas);
+            else
+            {
+                var heading = Quaternion.LookRotation(Vector3.ProjectOnPlane(view.forward, Vector3.up).normalized);
+                var offset = Quaternion.Inverse(heading) * (flow.contentCanvas.transform.position - view.position);
+                Check(Vector3.Distance(offset, new Vector3(0, 0, 2.5f)) < .025f, "Experience instruction is not centered 2.5m in front of the player.");
+                var rect = ((RectTransform)flow.contentCanvas.transform).rect;
+                var scale = flow.contentCanvas.transform.lossyScale;
+                Check(Mathf.Abs(rect.width * scale.x - 2.2f) < .025f && Mathf.Abs(rect.height * scale.y - 1.4f) < .025f,
+                    "Experience instruction canvas did not restore its physical size after the board score.");
+            }
             Check(flow.enclosure && flow.enclosure.BackgroundRenderer && flow.enclosure.FadeRenderer,
                 "Experience is missing its 360-degree black enclosure.");
             Check(!flow.enclosure.BackgroundRenderer.transform.IsChildOf(view) && !flow.enclosure.FadeRenderer.transform.IsChildOf(view),
                 "Black enclosure follows the player's head instead of the room.");
+        }
+
+        static void ValidateBoardPresentation(KinoExperienceController flow)
+        {
+            var board = flow.round.board;
+            bool covered = flow.Stage == KinoExperienceStage.Finale ||
+                flow.round.IsRunning && flow.round.State.Phase == KinoRoundPhase.SecondChanceReveal;
+            Check(board.numberGrid && board.NumbersVisible != covered &&
+                Mathf.Abs(board.numberGrid.alpha - (covered ? 0 : 1)) < .001f,
+                "Board numbers are not hidden only for the reveal/finale or failed to return for gameplay/menu.");
+            if (!covered) return;
+            Check(board.caughtMarkers.Count(marker => marker && marker.activeSelf) == flow.round.State.UniqueCount,
+                "Covering the number field erased caught-number state.");
+            var canvas = flow.Stage == KinoExperienceStage.Finale ? flow.contentCanvas :
+                flow.round.secondChancePresentation.announcementCanvas;
+            ValidateBoardOverlay(flow.round, canvas);
+        }
+
+        public static void ValidateBoardOverlay(KinoRoundController round, Canvas canvas)
+        {
+            var board = round.board;
+            var field = board.numberField;
+            Check(field && field.name == "Live number field", "Missing board number-field anchor.");
+            Check(canvas && canvas.renderMode == RenderMode.WorldSpace,
+                "Board presentation is not a world-space canvas.");
+            Check(Quaternion.Angle(canvas.transform.rotation, field.rotation) < .01f,
+                "Board presentation does not follow the board plane.");
+            var corners = new Vector3[4];
+            ((RectTransform)canvas.transform).GetWorldCorners(corners);
+            var projected = corners.Select(field.InverseTransformPoint).ToArray();
+            Check(Mathf.Abs(projected.Min(corner => corner.x) - field.rect.xMin) < .05f &&
+                Mathf.Abs(projected.Max(corner => corner.x) - field.rect.xMax) < .05f &&
+                Mathf.Abs(projected.Min(corner => corner.y) - field.rect.yMin) < .05f &&
+                Mathf.Abs(projected.Max(corner => corner.y) - field.rect.yMax) < .05f,
+                "Presentation does not cover exactly the number field below the existing KINO header.");
+            Check(projected.All(corner => corner.z < 0 && corner.z >= -3),
+                "Presentation moved away from the board surface.");
+            Check(!board.NumbersVisible && board.numberGrid && board.numberGrid.alpha < .001f,
+                "Live numbers remain visible behind the board presentation.");
+            Check(board.numberLabels.All(label => label && label.transform.IsChildOf(board.numberGrid.transform)) &&
+                board.caughtMarkers.All(marker => marker && marker.transform.IsChildOf(board.numberGrid.transform)) &&
+                board.multiplierLabels.All(label => label && label.transform.IsChildOf(board.numberGrid.transform)),
+                "A live number, caught marker or multiplier escaped the hidden grid.");
+            Check(round.secondChancePresentation.normalBrand && round.secondChancePresentation.normalBrand.activeInHierarchy,
+                "The board's existing KINO header was hidden by its presentation.");
         }
 
         static float VisibleAlpha(RawImage logo, CanvasGroup group) =>
@@ -590,30 +640,18 @@ namespace KinoVR.Editor
 
         static void ValidateBranding(KinoExperienceController flow, float elapsed)
         {
-            Check(Mathf.Abs(flow.BrandingDuration - (2 * flow.brandingSeconds + flow.logoBlackSeconds)) < .001f,
-                "Branding duration does not include both logos and the black pause.");
+            Check(Mathf.Abs(flow.BrandingDuration - flow.brandingSeconds) < .001f,
+                "Branding retained the removed KINO logo or inter-logo pause.");
             float allwyn = VisibleAlpha(flow.allwynLogo, flow.content), kino = VisibleAlpha(flow.kinoLogo, flow.content);
-            Check(allwyn < .001f || kino < .001f, "Allwyn and KINO are visible together.");
+            Check(kino < .001f, "The removed KINO logo is visible during branding.");
             Check(flow.enclosure.BackgroundAlpha > .99f && flow.content.alpha > .99f,
                 "Branding does not have an opaque black enclosure.");
             Check(flow.title.text == "" && flow.body.text == "" && flow.footer.text == "", "Branding has extra screen text.");
             if (elapsed > flow.logoFadeSeconds && elapsed < flow.brandingSeconds - flow.logoFadeSeconds)
             {
                 Check(allwyn > .99f && kino < .001f && flow.allwynLogo.rectTransform.anchoredPosition.sqrMagnitude < .01f,
-                    "Allwyn is not the first centered logo.");
+                    "Allwyn is not centered during branding.");
                 CaptureOnce(flow, "Branding-Allwyn");
-            }
-            else if (elapsed > flow.brandingSeconds + .05f && elapsed < flow.brandingSeconds + flow.logoBlackSeconds - .05f)
-            {
-                Check(allwyn < .001f && kino < .001f, "Logos did not fade fully to black between brands.");
-                CaptureOnce(flow, "Branding-Black");
-            }
-            else if (elapsed > flow.brandingSeconds + flow.logoBlackSeconds + flow.logoFadeSeconds &&
-                elapsed < flow.BrandingDuration - flow.logoFadeSeconds)
-            {
-                Check(kino > .99f && allwyn < .001f && flow.kinoLogo.rectTransform.anchoredPosition.sqrMagnitude < .01f,
-                    "KINO is not the second centered logo.");
-                CaptureOnce(flow, "Branding-KINO");
             }
         }
 
@@ -627,8 +665,7 @@ namespace KinoVR.Editor
             Check(visited.SequenceEqual(expected), "Session order changed: " + string.Join(",", visited));
             foreach (var phase in new[] { KinoRoundPhase.Main, KinoRoundPhase.Bonus, KinoRoundPhase.BoardHold, KinoRoundPhase.FadeOut,
                 KinoRoundPhase.SecondChanceReveal, KinoRoundPhase.SecondChance }) Check(phases.Contains(phase), "Round phase missing: " + phase);
-            foreach (var frame in new[] { "Branding-Allwyn", "Branding-Black", "Branding-KINO" })
-                Check(captured.Contains(frame), "Brand frame was not observable: " + frame);
+            Check(captured.Contains("Branding-Allwyn"), "Allwyn branding was not observable.");
             Check(captured.Contains("Enclosure-360"), "360-degree opaque instruction enclosure was not verified.");
             Check(results == run + 1 && closed == run + 1, "Result or close event repeated/missing.");
             Check(flow.Record.externalConfirmationUtc == null && flow.Record.safetyElapsedUtc != null, "Timed safety mislabeled.");
@@ -641,8 +678,8 @@ namespace KinoVR.Editor
             int expectedScore = flow.round.State.MainScore + KinoRoundState.BonusMultiplier * (1 + 3 + flow.Record.boostCatches);
             Check(flow.Record.score == expectedScore && completedLiveScore == expectedScore, "Final score omits or duplicates a phase.");
             Check(completedBlackout == 1 && completedAudio == 0, "Exit is not black and silent.");
-            Check(Mathf.Abs(flow.kinoLogo.rectTransform.rect.width / flow.kinoLogo.rectTransform.rect.height -
-                (float)flow.kinoLogo.texture.width / flow.kinoLogo.texture.height) < .01f, "KINO logo aspect changed.");
+            Check(!flow.kinoLogo.gameObject.activeInHierarchy,
+                "The removed KINO presentation logo was reactivated by session completion.");
         }
 
         static void VerifyRemount(KinoExperienceController flow)
@@ -662,7 +699,8 @@ namespace KinoVR.Editor
         {
             File.WriteAllText(KinoExperienceSetup.Output + "/play-test.txt",
                 "PASS: Normal click and Boost physical hand selection; debounce and duplicate-selection guards; no early balls; " +
-                "both complete session orders; Allwyn -> black -> KINO with exclusive centered logos on black; world-space screens at 2.5m; " +
+                "both complete session orders; centered Allwyn branding on black with no repeated KINO logo; world-space instructions at 2.5m; " +
+                "reveal/finale fitted to board number field, existing header retained, caught state preserved and numbers restored; " +
                 "20 numbered catches including 2-6 glow + 2-6 extra Mystery + red bonus + 3 green catches per run; " +
                 "live special appearance, material and halo reset; contact popup value/location and duplicate guards; " +
                 "Normal skips Boost; selected Boost follows all greens and adds +3 per catch; " +

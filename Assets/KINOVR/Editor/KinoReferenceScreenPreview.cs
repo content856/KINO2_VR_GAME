@@ -13,11 +13,53 @@ namespace KinoVR.Editor
 {
     // Exercises the runtime presentations in a disposable, unsaved copy of the scene.
     // Batch entry: -executeMethod KinoVR.Editor.KinoReferenceScreenPreview.CaptureBatch
+    [InitializeOnLoad]
     public static class KinoReferenceScreenPreview
     {
         const string ScenePath = "Assets/KinoRotunda/Scenes/KinoRotunda.unity";
         const string Output = "Artifacts/ReferenceScreens";
+        const string OpenEditorRequest = Output + "/capture-and-test.request";
         const BindingFlags PrivateInstance = BindingFlags.Instance | BindingFlags.NonPublic;
+
+        static KinoReferenceScreenPreview()
+        {
+            EditorApplication.update += ProcessOpenEditorRequest;
+        }
+
+        static void ProcessOpenEditorRequest()
+        {
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating || !File.Exists(OpenEditorRequest)) return;
+            File.Delete(OpenEditorRequest);
+            try
+            {
+                File.WriteAllText(Output + "/open-editor-request.txt", "RUNNING\n");
+                CaptureAndTestInOpenEditor();
+                File.WriteAllText(Output + "/open-editor-request.txt", "STARTED: captures validated; full Normal/Boost sessions running in the existing editor.\n");
+            }
+            catch (Exception error)
+            {
+                File.WriteAllText(Output + "/open-editor-request.txt", "FAIL: " + error);
+                Debug.LogException(error);
+            }
+        }
+
+        [MenuItem("Tools/KINO VR/Experience/Apply, capture and test in open editor")]
+        public static void CaptureAndTestInOpenEditor()
+        {
+            RequireCleanEditMode();
+            KinoExperienceSetup.Apply();
+            Capture();
+            KinoExperienceTests.RunDesktopInOpenEditor();
+        }
+
+        static void RequireCleanEditMode()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+                throw new InvalidOperationException("Exit Play mode before capturing reference screens.");
+            for (int i = 0; i < SceneManager.sceneCount; i++)
+                if (SceneManager.GetSceneAt(i).isDirty)
+                    throw new InvalidOperationException("Save open scenes before capturing reference screens.");
+        }
 
         public static void CaptureBatch()
         {
@@ -55,11 +97,7 @@ namespace KinoVR.Editor
         [MenuItem("Tools/KINO VR/Experience/Capture reference-style screens")]
         public static void Capture()
         {
-            if (EditorApplication.isPlayingOrWillChangePlaymode)
-                throw new InvalidOperationException("Exit Play mode before capturing reference screens.");
-            for (int i = 0; i < SceneManager.sceneCount; i++)
-                if (SceneManager.GetSceneAt(i).isDirty)
-                    throw new InvalidOperationException("Save open scenes before capturing reference screens.");
+            RequireCleanEditMode();
 
             Directory.CreateDirectory(Output);
             var previousScenes = EditorSceneManager.GetSceneManagerSetup();
@@ -74,6 +112,10 @@ namespace KinoVR.Editor
                 var round = Object.FindFirstObjectByType<KinoRoundController>();
                 if (!round || !round.experience || !round.playerView || !round.secondChancePresentation)
                     throw new InvalidOperationException("The main scene is missing its runtime screen references.");
+                // Runtime reparenting is allowed in Play; unpack only this disposable
+                // edit-mode fixture so the same docking code can run for screenshots.
+                var instance = PrefabUtility.GetOutermostPrefabInstanceRoot(round.gameObject);
+                if (instance) PrefabUtility.UnpackPrefabInstance(instance, PrefabUnpackMode.OutermostRoot, InteractionMode.AutomatedAction);
                 var flow = round.experience;
                 flow.writeLocalRecords = false;
                 Invoke(round.playerView, "Awake");
@@ -96,9 +138,12 @@ namespace KinoVR.Editor
 
                 var draw = ResolvedDraw();
                 round.secondChancePresentation.Present(draw, 65.4);
-                CapturePair(camera, round.secondChancePresentation.announcementCanvas,
+                KinoExperienceTests.ValidateBoardOverlay(round, round.secondChancePresentation.announcementCanvas);
+                CapturePair(camera, round.secondChancePresentation.announcementCanvas, round.board,
                     "SecondChance", playerFieldOfView);
                 round.secondChancePresentation.ResetPresentation();
+                if (!round.board.NumbersVisible || round.board.numberGrid.alpha < .999f)
+                    throw new InvalidOperationException("Resetting Second Chance did not reveal the numbers again.");
 
                 // Follow legal state transitions without starting the launcher or writing a session record.
                 var state = flow.State;
@@ -118,7 +163,10 @@ namespace KinoVR.Editor
                 typeof(KinoExperienceController).GetField("clock", PrivateInstance).SetValue(flow, now + 3);
                 Invoke(flow, "PresentStage");
                 Invoke(flow, "AnimateStage");
-                CapturePair(camera, flow.contentCanvas, "EndPanelScore", playerFieldOfView);
+                KinoExperienceTests.ValidateBoardOverlay(round, flow.contentCanvas);
+                if (flow.kinoLogo.gameObject.activeInHierarchy)
+                    throw new InvalidOperationException("Finale repeats the KINO logo already on the board.");
+                CapturePair(camera, flow.contentCanvas, round.board, "EndPanelScore", playerFieldOfView);
 
                 // Ensure the decorative score layout still accommodates plausible multi-digit results.
                 flow.Record.score = 144;
@@ -132,8 +180,9 @@ namespace KinoVR.Editor
                 File.WriteAllText(Output + "/validation.txt",
                     "PASS: existing experience state, second-chance rules/assets, and main-special rules.\n" +
                     "Runtime second-chance reveal and finale presentations rendered in the main scene.\n" +
+                    "Both overlays fit the board number field, hide live numbers and retain the board header; finale has no duplicate logo.\n" +
                     "SecondChance-player-view.png and EndPanelScore-player-view.png use the player camera pose/FOV.\n" +
-                    "Panel closeups keep that pose and fit the world-space canvas with a narrower field of view.\n" +
+                    "Board closeups turn from the same player position to fit the entire board, including its existing KINO header.\n" +
                     "Finale also checked for text overflow with score 144. Preview score 44 is fixture data.\n");
                 Debug.Log("KINO_REFERENCE_SCREENS_READY");
             }
@@ -165,7 +214,7 @@ namespace KinoVR.Editor
             return state;
         }
 
-        static void CapturePair(Camera camera, Canvas canvas, string name, float playerFieldOfView)
+        static void CapturePair(Camera camera, Canvas canvas, KinoNumberBoard board, string name, float playerFieldOfView)
         {
             RefreshText(canvas);
             foreach (var label in canvas.GetComponentsInChildren<TMP_Text>())
@@ -174,17 +223,25 @@ namespace KinoVR.Editor
             camera.fieldOfView = playerFieldOfView;
             Render(camera, Output + "/" + name + "-player-view.png");
             var corners = new Vector3[4];
-            ((RectTransform)canvas.transform).GetWorldCorners(corners);
-            float halfAngle = 0;
-            foreach (var corner in corners)
+            var boardRect = (RectTransform)board.transform;
+            boardRect.GetWorldCorners(corners);
+            var playerRotation = camera.transform.rotation;
+            try
             {
-                Vector3 point = camera.transform.InverseTransformPoint(corner);
-                if (point.z <= 0) throw new InvalidOperationException("Preview canvas is behind the player.");
-                halfAngle = Mathf.Max(halfAngle,
-                    Mathf.Atan(Mathf.Max(Mathf.Abs(point.y), Mathf.Abs(point.x) / camera.aspect) / point.z));
+                var boardCenter = boardRect.TransformPoint(boardRect.rect.center);
+                camera.transform.rotation = Quaternion.LookRotation(boardCenter - camera.transform.position, boardRect.up);
+                float halfAngle = 0;
+                foreach (var corner in corners)
+                {
+                    Vector3 point = camera.transform.InverseTransformPoint(corner);
+                    if (point.z <= 0) throw new InvalidOperationException("Preview board is behind the player.");
+                    halfAngle = Mathf.Max(halfAngle,
+                        Mathf.Atan(Mathf.Max(Mathf.Abs(point.y), Mathf.Abs(point.x) / camera.aspect) / point.z));
+                }
+                camera.fieldOfView = Mathf.Clamp(halfAngle * 2 * Mathf.Rad2Deg * 1.08f, 10, 120);
+                Render(camera, Output + "/" + name + "-panel.png");
             }
-            camera.fieldOfView = Mathf.Clamp(halfAngle * 2 * Mathf.Rad2Deg * 1.08f, 10, playerFieldOfView);
-            Render(camera, Output + "/" + name + "-panel.png");
+            finally { camera.transform.rotation = playerRotation; camera.fieldOfView = playerFieldOfView; }
         }
 
         static void RefreshText(Canvas canvas)
