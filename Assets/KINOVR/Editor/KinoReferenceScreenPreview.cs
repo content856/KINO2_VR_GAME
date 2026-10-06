@@ -149,9 +149,14 @@ namespace KinoVR.Editor
                 foreach (int number in new[] { 6, 11, 24, 35, 46, 57, 62, 74, 80 }) round.board.MarkCaught(number);
                 round.boostPresentation.PreviewBoost();
                 KinoExperienceTests.ValidateBoostHeader(round);
+                CapturePair(camera, round.boostPresentation.AnnouncementCanvas, round.board, "BoostIntro", playerFieldOfView);
+                round.boostPresentation.SetBoost(true, true);
+                KinoExperienceTests.ValidateBoostHeader(round);
                 CapturePair(camera, round.board.GetComponent<Canvas>(), round.board, "BoostHeader", playerFieldOfView,
-                    round.boostPresentation.announcement.transform);
+                    round.boostPresentation.activeBadge.transform);
                 round.boostPresentation.SetBoost(false);
+                if (!round.board.NumbersVisible || round.board.numberGrid.alpha < .999f)
+                    throw new InvalidOperationException("Resetting BOOST did not reveal the numbers again.");
                 round.board.ResetBoard();
 
                 // Follow legal state transitions without starting the launcher or writing a session record.
@@ -190,7 +195,7 @@ namespace KinoVR.Editor
                     "PASS: existing experience state, second-chance rules/assets, and main-special rules.\n" +
                     "Runtime second-chance reveal and finale presentations rendered in the main scene.\n" +
                     "Both overlays fit the board number field, hide live numbers and retain the board header; finale has no duplicate logo.\n" +
-                    "BOOST announcement stays in the header above visible numbers and caught markers. Panel artwork leaves the original blue board visible.\n" +
+                    "BOOST introduction covers the hidden number field, then switches to its header above visible caught markers. No extra logo or opaque panel background.\n" +
                     "SecondChance-player-view.png and EndPanelScore-player-view.png use the player camera pose/FOV.\n" +
                     "Board closeups turn from the same player position to fit the entire board, including its existing KINO header.\n" +
                     "Finale also checked for text overflow with score 144. Preview score 44 is fixture data.\n");

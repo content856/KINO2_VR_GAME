@@ -248,15 +248,17 @@ namespace KinoVR.Editor
             state.Tick(start + 60);
             Check(state.TryBeginBonus() && state.TryRegisterBonusLaunch() && state.TryCatch(7, start + 60, true), "Cannot seed bonus.");
             Check(state.TryBeginSecondChanceTransition(start + 61), "Cannot seed transition.");
-            state.Tick(start + 64); state.Tick(start + 65); state.Tick(start + 68);
+            double revealAt = start + 61 + KinoRoundState.BoardHoldSeconds + KinoRoundState.FadeSeconds;
+            double greenAt = revealAt + KinoRoundState.RevealSeconds;
+            state.Tick(start + 64); state.Tick(revealAt); state.Tick(greenAt);
             for (int i = 0; i < 3; i++)
             {
-                Check(state.TryRegisterSecondChanceLaunch(start + 68 + i * 3), "Cannot seed green draw.");
-                Check(state.TryCatch(7, start + 68 + i * 3, false, true), "Cannot seed green catch.");
+                Check(state.TryRegisterSecondChanceLaunch(greenAt + i * 3), "Cannot seed green draw.");
+                Check(state.TryCatch(7, greenAt + i * 3, false, true), "Cannot seed green catch.");
             }
             target.showcaseBoostAfterSecondChance = true;
             target.RefreshClock();
-            Check(state.Phase == KinoRoundPhase.Boost, "Seeded history did not enter Boost.");
+            Check(state.Phase == KinoRoundPhase.BoostIntro, "Seeded history did not enter the Boost introduction.");
         }
     }
 }

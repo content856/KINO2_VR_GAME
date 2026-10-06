@@ -207,7 +207,7 @@ namespace KinoVR
             if (Stage == KinoExperienceStage.Complete) { ShowModeSelection(); return; }
             if (Stage == KinoExperienceStage.Gameplay && round.State.Phase >= KinoRoundPhase.BoardHold &&
                 round.State.Phase <= KinoRoundPhase.SecondChance && State.BeginSecondChance(clock)) PresentStage();
-            if (Stage == KinoExperienceStage.SecondChance && (round.State.Phase == KinoRoundPhase.Boost ||
+            if (Stage == KinoExperienceStage.SecondChance && (round.State.Phase == KinoRoundPhase.BoostIntro || round.State.Phase == KinoRoundPhase.Boost ||
                 round.State.Phase == KinoRoundPhase.BoostSettling) && State.BeginBoost(clock)) PresentStage();
             var previous = Stage;
             if (State.Advance(clock, startupSeconds, safetySeconds, BrandingDuration, introductionSeconds,

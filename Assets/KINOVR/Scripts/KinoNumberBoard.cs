@@ -21,8 +21,8 @@ namespace KinoVR
         public Color bonusCaughtColor = Color.white;
         public RectTransform numberField;
         public CanvasGroup numberGrid;
-        bool secondChanceCover, finaleCover;
-        public bool NumbersVisible => !secondChanceCover && !finaleCover;
+        bool secondChanceCover, finaleCover, boostCover;
+        public bool NumbersVisible => !secondChanceCover && !finaleCover && !boostCover;
 
         public void SetSecondChanceCover(bool visible)
         {
@@ -32,6 +32,11 @@ namespace KinoVR
         public void SetFinaleCover(bool visible)
         {
             finaleCover = visible;
+            ApplyNumberVisibility();
+        }
+        public void SetBoostCover(bool visible)
+        {
+            boostCover = visible;
             ApplyNumberVisibility();
         }
         void ApplyNumberVisibility()
@@ -59,7 +64,7 @@ namespace KinoVR
             SetProgress(state.Score, state.RemainingSeconds, state.PhaseDuration, finished);
             if (statusText && !finished)
                 statusText.text = state.Phase == KinoRoundPhase.Bonus ? "KINO BONUS <color=#FF394F>x3</color>" :
-                    state.Phase == KinoRoundPhase.Boost || state.Phase == KinoRoundPhase.BoostSettling ? "KINO BOOST <color=#FFD34D>x3</color>" :
+                    state.Phase == KinoRoundPhase.Boost || state.Phase == KinoRoundPhase.BoostSettling || state.Phase == KinoRoundPhase.BoostIntro ? "KINO BOOST <color=#FFD34D>x3</color>" :
                     state.Phase == KinoRoundPhase.SecondChance ? "SECOND CHANCE <color=#36EB69>x3</color>" :
                     state.Phase == KinoRoundPhase.Settling ? "LAST BALLS" : "SCORE";
             if (caughtTotalText) caughtTotalText.text = state.Phase == KinoRoundPhase.SecondChance ?
@@ -68,7 +73,7 @@ namespace KinoVR
         }
         public void ResetBoard()
         {
-            secondChanceCover = finaleCover = false;
+            secondChanceCover = finaleCover = boostCover = false;
             ApplyNumberVisibility();
             for (int i = 0; i < 80; i++)
             {

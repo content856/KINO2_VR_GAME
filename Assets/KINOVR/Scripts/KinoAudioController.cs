@@ -147,7 +147,9 @@ namespace KinoVR
                     case KinoRoundPhase.Bonus: Play(KinoSound.BonusReveal, transform.position); break;
                     case KinoRoundPhase.FadeOut: Play(KinoSound.SecondChanceOut, transform.position); break;
                     case KinoRoundPhase.SecondChanceReveal: Play(KinoSound.SecondChanceReveal, transform.position); break;
+                    case KinoRoundPhase.BoostIntro:
                     case KinoRoundPhase.Boost:
+                        if (previous == KinoRoundPhase.BoostIntro) break;
                         if (boostMusic && boostMusic.clip) { boostMusic.time = 0; boostMusic.Play(); }
                         Play(KinoSound.BoostStart, transform.position);
                         break;
@@ -247,7 +249,7 @@ namespace KinoVR
             if (!initialized || suspended) return;
             float dt = Time.unscaledDeltaTime;
             double now = Time.unscaledTimeAsDouble;
-            bool boosting = phase == KinoRoundPhase.Boost || phase == KinoRoundPhase.BoostSettling;
+            bool boosting = phase == KinoRoundPhase.BoostIntro || phase == KinoRoundPhase.Boost || phase == KinoRoundPhase.BoostSettling;
             bool idle = !round || !round.IsRunning;
             boostBlend = Mathf.MoveTowards(boostBlend, boosting ? 1 : 0, dt / Mathf.Max(.1f, musicCrossfadeSeconds));
             bool speech = announcement && announcement.isPlaying;

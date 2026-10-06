@@ -210,7 +210,7 @@ namespace KinoVR.Editor
         {
             if (!font) font = PrepareFont();
             var goldText = PrepareGoldText(font);
-            void Header(GameObject group, bool announcement)
+            void Header(GameObject group)
             {
                 if (!group) throw new InvalidOperationException("Missing BOOST header group.");
                 for (int i = group.transform.childCount - 1; i >= 0; i--)
@@ -219,7 +219,7 @@ namespace KinoVR.Editor
                 var rect = (RectTransform)group.transform;
                 rect.anchorMin = rect.anchorMax = rect.pivot = Vector2.one * .5f;
                 Place(rect, new Vector2(4, 253), new Vector2(335, 82));
-                var title = Label("BOOST title", rect, font, new Vector2(0, 15), new Vector2(330, 54), announcement ? 47 : 43);
+                var title = Label("BOOST title", rect, font, new Vector2(0, 15), new Vector2(330, 54), 43);
                 title.text = "BOOST";
                 KinoScreenTypography.Gold(title, goldText);
                 var detail = Label("Boost points", rect, font, new Vector2(0, -23), new Vector2(330, 30), 23);
@@ -227,8 +227,27 @@ namespace KinoVR.Editor
                 detail.color = KinoScreenTypography.Ivory;
                 group.SetActive(false);
             }
-            Header(presentation.announcement.gameObject, true);
-            Header(presentation.activeBadge, false);
+            Header(presentation.activeBadge);
+            var intro = presentation.announcement;
+            for (int i = intro.transform.childCount - 1; i >= 0; i--)
+                UnityEngine.Object.DestroyImmediate(intro.transform.GetChild(i).gameObject);
+            var canvas = intro.GetComponent<Canvas>();
+            if (!canvas) canvas = intro.gameObject.AddComponent<Canvas>();
+            KinoBoardOverlay.Place(canvas, presentation.board, KinoBoardOverlay.ArtworkSize);
+            var frame = new GameObject("Boost gold frame", typeof(RectTransform), typeof(KinoBoostPanel)).GetComponent<KinoBoostPanel>();
+            frame.transform.SetParent(intro.transform, false);
+            Place(frame.rectTransform, Vector2.zero, KinoBoardOverlay.ArtworkSize);
+            frame.raycastTarget = false;
+            var title = Label("BOOST introduction", intro.transform, font, new Vector2(0, 70), new Vector2(760, 165), 145);
+            title.text = "BOOST";
+            KinoScreenTypography.Gold(title, goldText);
+            var points = Label("Boost triple points", intro.transform, font, new Vector2(0, -55), new Vector2(430, 85), 61);
+            points.text = "x3 ΠΟΝΤΟΙ";
+            points.color = KinoScreenTypography.Ivory;
+            var explanation = Label("Boost faster balls", intro.transform, font, new Vector2(0, -154), new Vector2(860, 65), 37);
+            explanation.text = "ΠΙΟ ΓΡΗΓΟΡΕΣ ΜΠΑΛΕΣ";
+            explanation.color = KinoScreenTypography.Ivory;
+            intro.gameObject.SetActive(false);
             presentation.announcement.alpha = 0;
         }
         static void ConfigureBoardOverlays(KinoNumberBoard board)
@@ -259,6 +278,7 @@ namespace KinoVR.Editor
             foreach (var label in board.multiplierLabels) if (label) Move(label.transform);
             board.SetSecondChanceCover(false);
             board.SetFinaleCover(false);
+            board.SetBoostCover(false);
         }
         static Canvas NewCanvas(string name, Transform parent, Vector2 size)
         {

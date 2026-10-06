@@ -96,23 +96,32 @@ namespace KinoVR.Editor
             }
             Check(state.NormalLaunchCount + state.SecondChanceLaunchCount == 23 && state.Score == 15 && state.UniqueCount == 3, "20+3 quota, green +3 or memory failure.");
             Check(!state.TryRegisterSecondChanceLaunch(100), "Fourth green launch.");
-            Check(state.TryBeginShowcaseBoost(74, 25, 1), "Showcase did not start.");
+            Check(state.TryBeginShowcaseBoost(74, 25, 1, 2.2f), "Showcase introduction did not start.");
+            double boostAt = 74 + (double)2.2f;
+            Check(state.Phase == KinoRoundPhase.BoostIntro && state.RemainingSeconds == 25, "Introduction consumed Boost time.");
+            state.Tick(boostAt - .001);
+            Check(state.Phase == KinoRoundPhase.BoostIntro && !state.TryRegisterBoostLaunch(boostAt - .001) &&
+                !state.TryRegisterNormalLaunch(boostAt - .001) && !state.TryRegisterSecondChanceLaunch(boostAt - .001) &&
+                state.BoostLaunchCount == 0, "A ball launched before the 2.2-second introduction ended.");
+            state.Tick(boostAt);
+            Check(state.Phase == KinoRoundPhase.Boost && state.RemainingSeconds == 25 && state.PhaseStartedAt == boostAt,
+                "Boost did not start with its full time after the introduction.");
             for (int i = 0; i < 2; i++)
             {
-                Check(state.TryRegisterBoostLaunch(74 + i), "Boost launch missing.");
-                Check(!state.TryCatch(79, 74 + i, false, false, true), "Boost introduced a new number.");
-                Check(state.TryCatch(7, 74 + i, false, false, true), "Repeated Boost catch failed.");
+                Check(state.TryRegisterBoostLaunch(boostAt + i), "Boost launch missing.");
+                Check(!state.TryCatch(79, boostAt + i, false, false, true), "Boost introduced a new number.");
+                Check(state.TryCatch(7, boostAt + i, false, false, true), "Repeated Boost catch failed.");
             }
             Check(state.Score == 21 && state.BoostCatchCount == 2 && state.UniqueCount == 3, "Repeated Boost catch did not award +3 each time.");
-            state.Tick(99);
-            Check(state.Phase == KinoRoundPhase.BoostSettling && !state.TryRegisterBoostLaunch(99), "Boost deadline failed.");
+            state.Tick(boostAt + 25);
+            Check(state.Phase == KinoRoundPhase.BoostSettling && !state.TryRegisterBoostLaunch(boostAt + 25), "Boost deadline failed.");
             state.Stop(); state.Begin(60, 100);
             Check(state.Score == 0 && state.UniqueCount == 0 && state.SecondChanceLaunchCount == 0 && state.BoostLaunchCount == 0 && !state.BonusLaunched, "Restart retained phase data.");
             state = ResolvedDraw(false);
             Check(!state.TryBeginBonus() && state.IsRunning, "Empty main draw must still get Second Chance.");
             greenAt = Reveal(state, 60);
             for (int i = 0; i < 3; i++) { state.TryRegisterSecondChanceLaunch(greenAt + i * 3); state.TryMiss(false, true); }
-            Check(state.ResolvedSecondChanceCount == 3 && !state.TryBeginShowcaseBoost(74, 25, 1), "Empty eligible set started Boost.");
+            Check(state.ResolvedSecondChanceCount == 3 && !state.TryBeginShowcaseBoost(74, 25, 1, 2.2f), "Empty eligible set started Boost.");
             Directory.CreateDirectory(Folder);
             File.WriteAllText(Folder + "/rules.txt", "PASS: normal 20 slots; last-flight grace; one red bonus before Second Chance; caught-only candidates; 3s board hold; 1.5s fade each way and 2s fully visible reading hold; reveal blocks launches; exactly 3 greens at 3s spacing; green +3; total 23 draw balls; optional timed Boost repeats caught numbers and awards +3 each catch; empty sets; deadlines; restart.\n");
         }

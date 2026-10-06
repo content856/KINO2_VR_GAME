@@ -210,6 +210,9 @@ namespace KinoVR.Editor
                     "A duplicate KINO logo appeared after mode selection or on the final score.");
                 ValidateBoardPresentation(flow);
                 if (flow.round.boostPresentation.IsBoostActive) ValidateBoostHeader(flow.round);
+                if (flow.round.State.Phase == KinoRoundPhase.BoostIntro)
+                    Check(flow.round.State.RemainingSeconds == flow.round.showcaseBoostDuration && flow.round.State.BoostLaunchCount == 0 &&
+                        flow.round.launcher.ActiveBallCount == 0, "BOOST introduction consumed playing time or overlapped a ball.");
                 if (flow.Stage < KinoExperienceStage.Gameplay || flow.Stage >= KinoExperienceStage.Finale)
                     Check(!flow.round.IsRunning && flow.round.launcher.ActiveBallCount == 0, "Balls outside gameplay.");
                 Check(!flow.round.restartButton.IsVisible, "Player restart visible in guided session.");
@@ -240,6 +243,7 @@ namespace KinoVR.Editor
                 {
                     string capture = flow.Stage.ToString();
                     if (flow.Stage == KinoExperienceStage.SecondChance) capture += "-" + flow.round.State.Phase;
+                    if (flow.Stage == KinoExperienceStage.Boost) capture += "-" + flow.round.State.Phase;
                     if (elapsed > .35f && flow.Stage != KinoExperienceStage.Complete) CaptureOnce(flow, capture);
                 }
             }
@@ -501,14 +505,15 @@ namespace KinoVR.Editor
         {
             var board = flow.round.board;
             bool covered = flow.Stage == KinoExperienceStage.Finale ||
-                flow.round.IsRunning && flow.round.State.Phase == KinoRoundPhase.SecondChanceReveal;
+                flow.round.IsRunning && (flow.round.State.Phase == KinoRoundPhase.SecondChanceReveal || flow.round.State.Phase == KinoRoundPhase.BoostIntro);
             Check(board.numberGrid && board.NumbersVisible != covered &&
                 Mathf.Abs(board.numberGrid.alpha - (covered ? 0 : 1)) < .001f,
-                "Board numbers are not hidden only for the reveal/finale or failed to return for gameplay/menu.");
+                "Board numbers are not hidden only for announcements/finale or failed to return for gameplay/menu.");
             if (!covered) return;
             Check(board.caughtMarkers.Count(marker => marker && marker.activeSelf) == flow.round.State.UniqueCount,
                 "Covering the number field erased caught-number state.");
             var canvas = flow.Stage == KinoExperienceStage.Finale ? flow.contentCanvas :
+                flow.round.State.Phase == KinoRoundPhase.BoostIntro ? flow.round.boostPresentation.AnnouncementCanvas :
                 flow.round.secondChancePresentation.announcementCanvas;
             ValidateBoardOverlay(flow.round, canvas);
         }
@@ -518,12 +523,18 @@ namespace KinoVR.Editor
             var boost = round.boostPresentation;
             bool announcing = boost.announcement.gameObject.activeInHierarchy;
             Check(announcing != boost.activeBadge.activeInHierarchy, "BOOST announcement and active header overlap or both disappeared.");
+            if (announcing)
+            {
+                Check(boost.IsAnnouncing && round.launcher.ActiveBallCount == 0, "A physical ball overlaps the BOOST introduction.");
+                ValidateBoardOverlay(round, boost.AnnouncementCanvas);
+                return;
+            }
             Check(round.board.NumbersVisible && round.board.numberGrid.alpha > .999f, "BOOST hid the live number field.");
             var boardRect = (RectTransform)round.board.transform;
             var fieldCorners = new Vector3[4];
             round.board.numberField.GetWorldCorners(fieldCorners);
             float numberTop = fieldCorners.Max(corner => boardRect.InverseTransformPoint(corner).y);
-            var group = announcing ? boost.announcement.transform : boost.activeBadge.transform;
+            var group = boost.activeBadge.transform;
             var corners = new Vector3[4];
             ((RectTransform)group).GetWorldCorners(corners);
             Check(corners.All(corner => boardRect.InverseTransformPoint(corner).y > numberTop &&
@@ -688,6 +699,7 @@ namespace KinoVR.Editor
             Check(visited.SequenceEqual(expected), "Session order changed: " + string.Join(",", visited));
             foreach (var phase in new[] { KinoRoundPhase.Main, KinoRoundPhase.Bonus, KinoRoundPhase.BoardHold, KinoRoundPhase.FadeOut,
                 KinoRoundPhase.SecondChanceReveal, KinoRoundPhase.SecondChance }) Check(phases.Contains(phase), "Round phase missing: " + phase);
+            Check(phases.Contains(KinoRoundPhase.BoostIntro) == (run == 1), "BOOST introduction missing or shown in Normal mode.");
             Check(captured.Contains("Branding-Allwyn"), "Allwyn branding was not observable.");
             Check(captured.Contains("Enclosure-360"), "360-degree opaque instruction enclosure was not verified.");
             Check(results == run + 1 && closed == run + 1, "Result or close event repeated/missing.");
@@ -726,7 +738,7 @@ namespace KinoVR.Editor
                 "reveal/finale fitted to board number field, existing header retained, caught state preserved and numbers restored; " +
                 "20 numbered catches including 2-6 glow + 2-6 extra Mystery + red bonus + 3 green catches per run; " +
                 "live special appearance, material and halo reset; contact popup value/location and duplicate guards; " +
-                "Normal skips Boost; selected Boost follows all greens and adds +3 per catch; " +
+                "Normal skips Boost; selected Boost follows all greens, holds its introduction with zero balls and a full timer, restores numbers and its small header, and adds +3 per catch; " +
                 "one result/close event per session; result mode and Boost score; safety record semantics; text fit; " +
                 "floor-bound 360-degree enclosure at world origin; opaque instruction pixels verified at yaw 90/180/270 and straight up/down; " +
                 "black/silent completion; five real-second closing instruction; automatic menu return with unchanged records/events; " +

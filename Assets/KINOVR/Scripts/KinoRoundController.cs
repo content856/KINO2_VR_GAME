@@ -78,10 +78,10 @@ namespace KinoVR
                 if (State.Phase == KinoRoundPhase.SecondChance && State.ResolvedSecondChanceCount == KinoRoundState.SecondChanceBallLimit &&
                     noFlights)
                 {
-                    if (!showcaseBoostAfterSecondChance || !State.TryBeginShowcaseBoost(Time.timeAsDouble, showcaseBoostDuration, showcaseBoostInterval)) FinishRound();
+                    if (!showcaseBoostAfterSecondChance || !State.TryBeginShowcaseBoost(Time.timeAsDouble, showcaseBoostDuration, showcaseBoostInterval,
+                        boostPresentation ? boostPresentation.announcementSeconds : 0)) FinishRound();
                     else
                     {
-                        if (boostPresentation) boostPresentation.SetBoost(true, true);
                         if (launcher) launcher.SetPace(1, 1, .75f);
                     }
                 }
@@ -135,6 +135,7 @@ namespace KinoVR
             if (audioController) audioController.Present(State);
             if (board) board.SetRoundProgress(State, finishPresented);
             if (secondChancePresentation) secondChancePresentation.Present(State, Time.timeAsDouble);
+            if (boostPresentation) boostPresentation.Present(State, Time.timeAsDouble);
         }
         void OnDisable()
         {

@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace KinoVR
 {
-    // Both announcements replace the board's number field, below its existing header.
+    // Announcements replace the board's number field, below its existing header.
     public static class KinoBoardOverlay
     {
         public static readonly Vector2 ArtworkSize = new Vector2(1020, 480);

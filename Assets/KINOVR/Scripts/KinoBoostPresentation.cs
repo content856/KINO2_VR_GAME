@@ -18,6 +18,8 @@ namespace KinoVR
         public AudioSource announcementAudio;
         [Min(.5f)] public float announcementSeconds = 2.2f;
         public bool IsBoostActive { get; private set; }
+        public bool IsAnnouncing { get; private set; }
+        public Canvas AnnouncementCanvas => announcement ? announcement.GetComponent<Canvas>() : null;
 
         readonly List<Material> panelCopies = new List<Material>();
         readonly Dictionary<Material, Material> ledCopies = new Dictionary<Material, Material>();
@@ -26,7 +28,7 @@ namespace KinoVR
         readonly List<Material> originalPanels = new List<Material>();
         Volume volume;
         VolumeProfile profile;
-        float transition, announcedAt;
+        float transition;
         bool initialized;
 
         void Awake() => Initialize();
@@ -84,24 +86,27 @@ namespace KinoVR
             bloom.intensity.Override(.65f);
             bloom.tint.Override(new Color(1, .72f, .28f));
         }
-        public void SetBoost(bool active, bool immediate = false)
+        public void SetBoost(bool active, bool immediate = false, bool showAnnouncement = false)
         {
             if (active && !initialized) Initialize();
             bool entering = active && !IsBoostActive;
             IsBoostActive = active;
-            if (activeBadge) activeBadge.SetActive(active && !announcement);
-            if (normalBrand) normalBrand.SetActive(!active);
+            bool announcing = active && showAnnouncement;
+            if (announcing && !IsAnnouncing) KinoBoardOverlay.Place(AnnouncementCanvas, board, KinoBoardOverlay.ArtworkSize);
+            IsAnnouncing = announcing;
+            if (board) board.SetBoostCover(announcing);
+            if (activeBadge) activeBadge.SetActive(active && !announcing);
+            if (normalBrand) normalBrand.SetActive(!active || announcing);
             if (goldAccents) goldAccents.SetActive(active);
             if (board) board.SetBoostColors(active);
             if (entering)
             {
-                announcedAt = Time.unscaledTime;
                 if (announcementAudio && announcementAudio.clip) announcementAudio.Play();
             }
             if (announcement)
             {
-                announcement.gameObject.SetActive(active);
-                announcement.alpha = active ? 1 : 0;
+                announcement.gameObject.SetActive(announcing);
+                announcement.alpha = announcing ? 1 : 0;
             }
             if (active && immediate)
             {
@@ -123,16 +128,14 @@ namespace KinoVR
                 transition = Mathf.MoveTowards(transition, 1, Time.deltaTime / .3f);
                 ApplyLighting(transition);
             }
-            if (announcement && announcement.gameObject.activeSelf)
-            {
-                float elapsed = Time.unscaledTime - announcedAt;
-                announcement.alpha = Mathf.Clamp01((announcementSeconds - elapsed) / .35f);
-                if (elapsed >= announcementSeconds)
-                {
-                    announcement.gameObject.SetActive(false);
-                    if (activeBadge) activeBadge.SetActive(true);
-                }
-            }
+        }
+        public void Present(KinoRoundState state, double now)
+        {
+            bool intro = state.Phase == KinoRoundPhase.BoostIntro;
+            bool active = intro || state.Phase == KinoRoundPhase.Boost || state.Phase == KinoRoundPhase.BoostSettling;
+            if (active != IsBoostActive || intro != IsAnnouncing) SetBoost(active, true, intro);
+            if (intro && announcement)
+                announcement.alpha = Mathf.Clamp01((announcementSeconds - (float)(now - state.PhaseStartedAt)) / .35f);
         }
         void ApplyLighting(float amount)
         {
@@ -165,7 +168,7 @@ namespace KinoVR
         // Used by the explicit editor preview command, without entering the game clock.
         public void PreviewBoost()
         {
-            SetBoost(true);
+            SetBoost(true, true, true);
             transition = 1;
             ApplyLighting(1);
         }

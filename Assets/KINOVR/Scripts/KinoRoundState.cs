@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace KinoVR
 {
-    public enum KinoRoundPhase { Idle, Main, Settling, Bonus, Complete, BoardHold, FadeOut, SecondChanceReveal, SecondChance, Boost, BoostSettling }
+    public enum KinoRoundPhase { Idle, Main, Settling, Bonus, Complete, BoardHold, FadeOut, SecondChanceReveal, SecondChance, Boost, BoostSettling, BoostIntro }
     // Scene-independent draw quota, catch memory and final-bonus rules.
     public sealed class KinoRoundState
     {
@@ -19,7 +19,7 @@ namespace KinoVR
         readonly List<int> caughtNumbers = new List<int>(NormalBallLimit);
         double startedAt, drawDeadline;
         double boostDeadline;
-        float boostInterval;
+        float boostInterval, boostIntroSeconds;
         readonly bool[] glowSlots = new bool[NormalBallLimit];
         readonly List<double> mysteryOffsets = new List<double>(6);
         double multiplierDeadline;
@@ -164,9 +164,16 @@ namespace KinoVR
                 EnterPhase(KinoRoundPhase.SecondChanceReveal, now);
             else if (Phase == KinoRoundPhase.SecondChanceReveal && now - PhaseStartedAt >= RevealSeconds)
                 EnterPhase(KinoRoundPhase.SecondChance, now);
+            else if (Phase == KinoRoundPhase.BoostIntro && now - PhaseStartedAt >= boostIntroSeconds)
+            {
+                EnterPhase(KinoRoundPhase.Boost, now);
+                // The full playing time starts after the announcement has finished.
+                boostDeadline = now + PhaseDuration;
+            }
             if (Phase == KinoRoundPhase.Boost && now >= boostDeadline) Phase = KinoRoundPhase.BoostSettling;
             RemainingSeconds = Phase == KinoRoundPhase.Main ? (float)Math.Max(0, drawDeadline - now) :
-                Phase == KinoRoundPhase.Boost ? (float)Math.Max(0, boostDeadline - now) : 0;
+                Phase == KinoRoundPhase.Boost ? (float)Math.Max(0, boostDeadline - now) :
+                Phase == KinoRoundPhase.BoostIntro ? PhaseDuration : 0;
         }
         public bool IsNormalLaunchDue(double now) => IsRunning &&
             (Phase == KinoRoundPhase.Main || Phase == KinoRoundPhase.Settling) &&
@@ -207,12 +214,15 @@ namespace KinoVR
             ClearMultiplier();
             return true;
         }
-        public bool TryBeginShowcaseBoost(double now, float duration, float interval)
+        public bool TryBeginShowcaseBoost(double now, float duration, float interval, float introductionSeconds = 0)
         {
             if (!IsRunning || Phase != KinoRoundPhase.SecondChance || ResolvedSecondChanceCount != SecondChanceBallLimit || UniqueCount == 0) return false;
             if (float.IsNaN(duration) || float.IsInfinity(duration) || duration <= 0 ||
-                float.IsNaN(interval) || float.IsInfinity(interval) || interval <= 0) throw new ArgumentOutOfRangeException(nameof(duration));
-            EnterPhase(KinoRoundPhase.Boost, now);
+                float.IsNaN(interval) || float.IsInfinity(interval) || interval <= 0 ||
+                float.IsNaN(introductionSeconds) || float.IsInfinity(introductionSeconds) || introductionSeconds < 0)
+                throw new ArgumentOutOfRangeException(nameof(duration));
+            boostIntroSeconds = introductionSeconds;
+            EnterPhase(introductionSeconds > 0 ? KinoRoundPhase.BoostIntro : KinoRoundPhase.Boost, now);
             PhaseDuration = RemainingSeconds = duration;
             boostDeadline = now + duration;
             boostInterval = interval;

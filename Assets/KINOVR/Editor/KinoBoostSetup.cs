@@ -255,14 +255,14 @@ namespace KinoVR.Editor
                 Canvas.ForceUpdateCanvases();
                 CaptureBoostCamera(camera, "Room-boost-announcement");
                 CaptureQuestSettings(camera, round, "Quest-settings-boost-announcement");
-                preview.announcement.gameObject.SetActive(false);
+                preview.SetBoost(true, true);
                 CaptureBoostCamera(camera, "Room-boost-play");
                 CaptureQuestSettings(camera, round, "Quest-settings-boost-play");
                 var bounds = Screen().bounds;
                 camera.orthographic = true;
                 camera.orthographicSize = bounds.size.y * .52f;
                 camera.transform.SetPositionAndRotation(bounds.center + Vector3.back * 2, Quaternion.identity);
-                preview.announcement.gameObject.SetActive(true);
+                preview.PreviewBoost();
                 CaptureBoostCamera(camera, "Board-boost-announcement");
                 preview.SetBoost(false);
                 round.board.ResetBoard();
