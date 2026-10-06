@@ -15,10 +15,7 @@ namespace KinoVR
             var face = new Rect(-510, -275, 1020, 550);
             var gold = new Color(1, .82f, .43f);
             var emerald = new Color(.12f, 1, .35f);
-            KinoPanelMesh.RoundedFill(vh, new Rect(-516, -285, 1032, 562), 59,
-                new Color(0, 0, 0, .24f), new Color(0, 0, 0, .24f));
-            KinoPanelMesh.RoundedFill(vh, face, 54,
-                new Color(.012f, .04f, .024f, 1), new Color(.012f, .042f, .033f, 1));
+            // Leave the board's blue number-field artwork visible through the decoration.
             KinoPanelMesh.Glow(vh, new Vector2(-296, 68), new Vector2(266, 234), new Color(.015f, .48f, .13f, .13f));
             KinoPanelMesh.Glow(vh, new Vector2(0, -269), new Vector2(263, 53), new Color(.11f, 1, .2f, .16f));
             KinoPanelMesh.Glow(vh, new Vector2(0, 270), new Vector2(238, 35), new Color(.14f, 1, .18f, .19f));

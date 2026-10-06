@@ -32,6 +32,7 @@ namespace KinoVR.Editor
                 if (!flow) flow = root.AddComponent<KinoExperienceController>();
                 flow.round = round; round.experience = flow;
                 ConfigureBoardOverlays(round.board);
+                if (round.boostPresentation) ConfigureBoostHeader(round.boostPresentation, font);
                 round.startAutomatically = false; round.showcaseBoostAfterSecondChance = false;
                 if (round.launcher) round.launcher.autoStart = false;
                 if (!flow.contentCanvas) BuildPresentation(flow, font, allwyn, kino);
@@ -204,6 +205,31 @@ namespace KinoVR.Editor
             points.fontStyle = FontStyles.Bold;
             points.color = new Color(.3f, 1, .43f);
             canvas.gameObject.SetActive(false);
+        }
+        internal static void ConfigureBoostHeader(KinoBoostPresentation presentation, TMP_FontAsset font = null)
+        {
+            if (!font) font = PrepareFont();
+            var goldText = PrepareGoldText(font);
+            void Header(GameObject group, bool announcement)
+            {
+                if (!group) throw new InvalidOperationException("Missing BOOST header group.");
+                for (int i = group.transform.childCount - 1; i >= 0; i--)
+                    UnityEngine.Object.DestroyImmediate(group.transform.GetChild(i).gameObject);
+                // Central header bay, above the number field and between score/time.
+                var rect = (RectTransform)group.transform;
+                rect.anchorMin = rect.anchorMax = rect.pivot = Vector2.one * .5f;
+                Place(rect, new Vector2(4, 253), new Vector2(335, 82));
+                var title = Label("BOOST title", rect, font, new Vector2(0, 15), new Vector2(330, 54), announcement ? 47 : 43);
+                title.text = "BOOST";
+                KinoScreenTypography.Gold(title, goldText);
+                var detail = Label("Boost points", rect, font, new Vector2(0, -23), new Vector2(330, 30), 23);
+                detail.text = "x3 ΠΟΝΤΟΙ";
+                detail.color = KinoScreenTypography.Ivory;
+                group.SetActive(false);
+            }
+            Header(presentation.announcement.gameObject, true);
+            Header(presentation.activeBadge, false);
+            presentation.announcement.alpha = 0;
         }
         static void ConfigureBoardOverlays(KinoNumberBoard board)
         {

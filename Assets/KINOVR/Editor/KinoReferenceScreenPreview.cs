@@ -137,13 +137,22 @@ namespace KinoVR.Editor
                 float playerFieldOfView = camera.fieldOfView;
 
                 var draw = ResolvedDraw();
-                round.secondChancePresentation.Present(draw, 65.4);
+                round.secondChancePresentation.Present(draw, draw.PhaseStartedAt + KinoRoundState.FadeSeconds + .4);
                 KinoExperienceTests.ValidateBoardOverlay(round, round.secondChancePresentation.announcementCanvas);
                 CapturePair(camera, round.secondChancePresentation.announcementCanvas, round.board,
                     "SecondChance", playerFieldOfView);
                 round.secondChancePresentation.ResetPresentation();
                 if (!round.board.NumbersVisible || round.board.numberGrid.alpha < .999f)
                     throw new InvalidOperationException("Resetting Second Chance did not reveal the numbers again.");
+
+                // Show BOOST with actual caught markers beneath it, to verify header separation.
+                foreach (int number in new[] { 6, 11, 24, 35, 46, 57, 62, 74, 80 }) round.board.MarkCaught(number);
+                round.boostPresentation.PreviewBoost();
+                KinoExperienceTests.ValidateBoostHeader(round);
+                CapturePair(camera, round.board.GetComponent<Canvas>(), round.board, "BoostHeader", playerFieldOfView,
+                    round.boostPresentation.announcement.transform);
+                round.boostPresentation.SetBoost(false);
+                round.board.ResetBoard();
 
                 // Follow legal state transitions without starting the launcher or writing a session record.
                 var state = flow.State;
@@ -181,6 +190,7 @@ namespace KinoVR.Editor
                     "PASS: existing experience state, second-chance rules/assets, and main-special rules.\n" +
                     "Runtime second-chance reveal and finale presentations rendered in the main scene.\n" +
                     "Both overlays fit the board number field, hide live numbers and retain the board header; finale has no duplicate logo.\n" +
+                    "BOOST announcement stays in the header above visible numbers and caught markers. Panel artwork leaves the original blue board visible.\n" +
                     "SecondChance-player-view.png and EndPanelScore-player-view.png use the player camera pose/FOV.\n" +
                     "Board closeups turn from the same player position to fit the entire board, including its existing KINO header.\n" +
                     "Finale also checked for text overflow with score 144. Preview score 44 is fixture data.\n");
@@ -207,17 +217,17 @@ namespace KinoVR.Editor
             state.Tick(60);
             if (!state.TryBeginSecondChanceTransition(60))
                 throw new InvalidOperationException("Could not enter the second-chance transition.");
-            state.Tick(63);
-            state.Tick(64);
+            state.Tick(60 + KinoRoundState.BoardHoldSeconds);
+            state.Tick(60 + KinoRoundState.BoardHoldSeconds + KinoRoundState.FadeSeconds);
             if (state.Phase != KinoRoundPhase.SecondChanceReveal)
                 throw new InvalidOperationException("The reveal fixture is in the wrong phase.");
             return state;
         }
 
-        static void CapturePair(Camera camera, Canvas canvas, KinoNumberBoard board, string name, float playerFieldOfView)
+        static void CapturePair(Camera camera, Canvas canvas, KinoNumberBoard board, string name, float playerFieldOfView, Transform textRoot = null)
         {
             RefreshText(canvas);
-            foreach (var label in canvas.GetComponentsInChildren<TMP_Text>())
+            foreach (var label in (textRoot ? textRoot : canvas.transform).GetComponentsInChildren<TMP_Text>())
                 if (label.isTextOverflowing)
                     throw new InvalidOperationException(name + " text overflows: " + label.name);
             camera.fieldOfView = playerFieldOfView;

@@ -32,8 +32,8 @@ namespace KinoVR
             if (activeHeader) activeHeader.SetActive(active);
             if (normalBrand) normalBrand.SetActive(!active && phase != KinoRoundPhase.Boost && phase != KinoRoundPhase.BoostSettling);
             float elapsed = (float)(now - state.PhaseStartedAt);
-            SetFade(phase == KinoRoundPhase.FadeOut ? Mathf.Clamp01(elapsed / KinoRoundState.FadeSeconds) :
-                reveal ? 1 - Mathf.Clamp01(elapsed / KinoRoundState.FadeSeconds) : 0);
+            float fade = Mathf.SmoothStep(0, 1, elapsed / KinoRoundState.FadeSeconds);
+            SetFade(phase == KinoRoundPhase.FadeOut ? fade : reveal ? 1 - fade : 0);
         }
         void SetFade(float alpha)
         {

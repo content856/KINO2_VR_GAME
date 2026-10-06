@@ -89,7 +89,7 @@ namespace KinoVR
             if (active && !initialized) Initialize();
             bool entering = active && !IsBoostActive;
             IsBoostActive = active;
-            if (activeBadge) activeBadge.SetActive(active);
+            if (activeBadge) activeBadge.SetActive(active && !announcement);
             if (normalBrand) normalBrand.SetActive(!active);
             if (goldAccents) goldAccents.SetActive(active);
             if (board) board.SetBoostColors(active);
@@ -127,7 +127,11 @@ namespace KinoVR
             {
                 float elapsed = Time.unscaledTime - announcedAt;
                 announcement.alpha = Mathf.Clamp01((announcementSeconds - elapsed) / .35f);
-                if (elapsed >= announcementSeconds) announcement.gameObject.SetActive(false);
+                if (elapsed >= announcementSeconds)
+                {
+                    announcement.gameObject.SetActive(false);
+                    if (activeBadge) activeBadge.SetActive(true);
+                }
             }
         }
         void ApplyLighting(float amount)

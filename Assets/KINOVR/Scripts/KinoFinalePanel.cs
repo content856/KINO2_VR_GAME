@@ -15,10 +15,7 @@ namespace KinoVR
             var face = new Rect(-510, -240, 1020, 480);
             var gold = new Color(1, .79f, .36f);
             var bronze = new Color(.58f, .35f, .12f);
-            KinoPanelMesh.ChamferFill(vh, new Rect(-515, -248, 1030, 488), 29,
-                new Color(0, 0, 0, .28f), new Color(0, 0, 0, .28f));
-            KinoPanelMesh.ChamferFill(vh, face, 26,
-                new Color(.018f, .028f, .048f, 1), new Color(.024f, .047f, .083f, 1));
+            // The existing blue board supplies the background; only gold decoration is drawn.
             KinoPanelMesh.Glow(vh, new Vector2(0, -230), new Vector2(390, 58), new Color(.96f, .51f, .13f, .09f));
             for (int i = 3; i > 0; i--)
                 KinoPanelMesh.ChamferRing(vh, KinoPanelMesh.Inset(face, -i * 2), 26 + i * 2, 2,
@@ -42,8 +39,6 @@ namespace KinoVR
             KinoPanelMesh.Diamond(vh, new Vector2(0, -129), new Vector2(7, 7), gold);
             KinoPanelMesh.Diamond(vh, new Vector2(0, -129), new Vector2(3.6f, 3.6f), new Color(1, .94f, .69f));
             var capsule = new Rect(-325, -204, 650, 54);
-            KinoPanelMesh.RoundedFill(vh, capsule, 23,
-                new Color(.034f, .052f, .081f, .73f), new Color(.028f, .05f, .081f, .65f));
             KinoPanelMesh.RoundedRing(vh, capsule, 23, 1.55f,
                 new Color(1, .82f, .44f, .96f), new Color(.77f, .5f, .18f, .85f));
             KinoPanelMesh.Spark(vh, new Vector2(0, 238), 52, 12, new Color(1, .81f, .4f, .6f));

@@ -61,19 +61,22 @@ namespace KinoVR.Editor
             Check(state.TryMiss(false), "Last normal miss rejected.");
             return state;
         }
-        static void Reveal(KinoRoundState state, double start)
+        static double Reveal(KinoRoundState state, double start)
         {
             Check(state.TryBeginSecondChanceTransition(start), "Second Chance transition rejected.");
             state.Tick(start + 2.99);
             Check(state.Phase == KinoRoundPhase.BoardHold && !state.TryRegisterSecondChanceLaunch(start + 2.99), "Board did not stay visible for 3 seconds.");
             state.Tick(start + 3);
             Check(state.Phase == KinoRoundPhase.FadeOut, "Missing fade-out.");
-            state.Tick(start + 3.99);
-            Check(state.Phase == KinoRoundPhase.FadeOut, "Fade shorter than one second.");
-            state.Tick(start + 4);
-            Check(state.Phase == KinoRoundPhase.SecondChanceReveal && !state.TryRegisterSecondChanceLaunch(start + 4), "Launch behind title.");
-            state.Tick(start + 7);
+            state.Tick(start + 4.49);
+            Check(state.Phase == KinoRoundPhase.FadeOut, "Fade shorter than 1.5 seconds.");
+            state.Tick(start + 4.5);
+            Check(state.Phase == KinoRoundPhase.SecondChanceReveal && !state.TryRegisterSecondChanceLaunch(start + 4.5), "Launch behind title.");
+            state.Tick(start + 7.99);
+            Check(state.Phase == KinoRoundPhase.SecondChanceReveal && !state.TryRegisterSecondChanceLaunch(start + 7.99), "Title disappeared before the longer fade and reading hold ended.");
+            state.Tick(start + 8);
             Check(state.Phase == KinoRoundPhase.SecondChance, "Missing green phase.");
+            return start + 8;
         }
         public static void ValidateRules()
         {
@@ -83,13 +86,13 @@ namespace KinoVR.Editor
             Check(state.TryRegisterBonusLaunch() && !state.TryRegisterBonusLaunch(), "More than one red bonus.");
             Check(!state.TryCatch(80, 60, true), "Uncaught red bonus number.");
             Check(state.TryCatch(7, 60, true) && !state.TryCatch(7, 60, true) && state.Score == 6, "Bonus must award +3 once.");
-            Reveal(state, 60);
+            double greenAt = Reveal(state, 60);
             for (int i = 0; i < 3; i++)
             {
-                Check(!state.TryRegisterSecondChanceLaunch(67 + i * 3 - .001), "Early green launch.");
-                Check(state.TryRegisterSecondChanceLaunch(67 + i * 3), "Missing green launch.");
-                Check(!state.TryBeginShowcaseBoost(67 + i * 3, 25, 1), "Boost overlapped green flight.");
-                Check(state.TryCatch(i == 1 ? 80 : 7, 67 + i * 3, false, true), "Green catch failed.");
+                Check(!state.TryRegisterSecondChanceLaunch(greenAt + i * 3 - .001), "Early green launch.");
+                Check(state.TryRegisterSecondChanceLaunch(greenAt + i * 3), "Missing green launch.");
+                Check(!state.TryBeginShowcaseBoost(greenAt + i * 3, 25, 1), "Boost overlapped green flight.");
+                Check(state.TryCatch(i == 1 ? 80 : 7, greenAt + i * 3, false, true), "Green catch failed.");
             }
             Check(state.NormalLaunchCount + state.SecondChanceLaunchCount == 23 && state.Score == 15 && state.UniqueCount == 3, "20+3 quota, green +3 or memory failure.");
             Check(!state.TryRegisterSecondChanceLaunch(100), "Fourth green launch.");
@@ -107,11 +110,11 @@ namespace KinoVR.Editor
             Check(state.Score == 0 && state.UniqueCount == 0 && state.SecondChanceLaunchCount == 0 && state.BoostLaunchCount == 0 && !state.BonusLaunched, "Restart retained phase data.");
             state = ResolvedDraw(false);
             Check(!state.TryBeginBonus() && state.IsRunning, "Empty main draw must still get Second Chance.");
-            Reveal(state, 60);
-            for (int i = 0; i < 3; i++) { state.TryRegisterSecondChanceLaunch(67 + i * 3); state.TryMiss(false, true); }
+            greenAt = Reveal(state, 60);
+            for (int i = 0; i < 3; i++) { state.TryRegisterSecondChanceLaunch(greenAt + i * 3); state.TryMiss(false, true); }
             Check(state.ResolvedSecondChanceCount == 3 && !state.TryBeginShowcaseBoost(74, 25, 1), "Empty eligible set started Boost.");
             Directory.CreateDirectory(Folder);
-            File.WriteAllText(Folder + "/rules.txt", "PASS: normal 20 slots; last-flight grace; one red bonus before Second Chance; caught-only candidates; 3s board hold; 1s fade; reveal blocks launches; exactly 3 greens at 3s spacing; green +3; total 23 draw balls; optional timed Boost repeats caught numbers and awards +3 each catch; empty sets; deadlines; restart.\n");
+            File.WriteAllText(Folder + "/rules.txt", "PASS: normal 20 slots; last-flight grace; one red bonus before Second Chance; caught-only candidates; 3s board hold; 1.5s fade each way and 2s fully visible reading hold; reveal blocks launches; exactly 3 greens at 3s spacing; green +3; total 23 draw balls; optional timed Boost repeats caught numbers and awards +3 each catch; empty sets; deadlines; restart.\n");
         }
         public static void ValidateRulesAndAssets()
         {
@@ -212,7 +215,8 @@ namespace KinoVR.Editor
                 {
                     events.Add($"run {run}: {previous} -> {state.Phase} at {now - startedAt:F3}s (phase {now - phaseAt:F3}s)");
                     if (previous == KinoRoundPhase.BoardHold) Check(now - phaseAt >= 2.95, "Short board hold.");
-                    if (previous == KinoRoundPhase.FadeOut) Check(now - phaseAt >= .95, "Short fade.");
+                    if (previous == KinoRoundPhase.FadeOut) Check(now - phaseAt >= 1.45, "Short fade.");
+                    if (previous == KinoRoundPhase.SecondChanceReveal) Check(now - phaseAt >= 3.45, "Longer reveal did not preserve its reading hold.");
                     if (state.Phase == KinoRoundPhase.SecondChanceReveal) Check(round.secondChancePresentation.announcement.activeSelf, "Missing title.");
                     if (run == 0 && state.Phase == KinoRoundPhase.SecondChanceReveal)
                     {

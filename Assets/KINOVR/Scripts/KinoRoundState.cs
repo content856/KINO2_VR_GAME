@@ -11,8 +11,9 @@ namespace KinoVR
         public const int NormalBallLimit = 20;
         public const int SecondChanceBallLimit = 3;
         public const float BoardHoldSeconds = 3;
-        public const float FadeSeconds = 1;
-        public const float RevealSeconds = 3;
+        public const float FadeSeconds = 1.5f;
+        // Includes the fade back in, followed by two seconds of fully visible artwork.
+        public const float RevealSeconds = FadeSeconds + 2;
         public const float SecondChanceInterval = 3;
         readonly HashSet<int> numbers = new HashSet<int>();
         readonly List<int> caughtNumbers = new List<int>(NormalBallLimit);

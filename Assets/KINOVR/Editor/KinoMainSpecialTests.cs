@@ -55,10 +55,12 @@ namespace KinoVR.Editor
                 Check(state.TryBeginBonus() && state.ActiveMultiplier == 1 && state.MultiplierRemainingSeconds == 0, "Multiplier leaked into red bonus.");
                 Check(state.TryRegisterBonusLaunch() && state.TryCatch(1, duration, true) && state.Score == expectedScore + 3, "Red bonus value changed.");
                 Check(state.TryBeginSecondChanceTransition(duration), "Second Chance transition blocked.");
-                state.Tick(duration + 3); state.Tick(duration + 4); state.Tick(duration + 7);
+                double revealAt = duration + KinoRoundState.BoardHoldSeconds + KinoRoundState.FadeSeconds;
+                double greenAt = revealAt + KinoRoundState.RevealSeconds;
+                state.Tick(duration + KinoRoundState.BoardHoldSeconds); state.Tick(revealAt); state.Tick(greenAt);
                 for (int i = 0; i < 3; i++)
                 {
-                    Check(state.TryRegisterSecondChanceLaunch(duration + 7 + i * 3) && state.TryCatch(30 + i, duration + 7 + i * 3, isSecondChance: true), "Green catch rejected.");
+                    Check(state.TryRegisterSecondChanceLaunch(greenAt + i * 3) && state.TryCatch(30 + i, greenAt + i * 3, isSecondChance: true), "Green catch rejected.");
                 }
                 Check(state.Score == expectedScore + 12 && state.ActiveMultiplier == 1, "Main multiplier affected Second Chance.");
                 Check(state.TryBeginShowcaseBoost(duration + 14, 2, 1) && state.TryRegisterBoostLaunch(duration + 14) &&
@@ -140,9 +142,11 @@ namespace KinoVR.Editor
                 state.Tick(45);
                 Check(state.TryBeginBonus() && state.TryRegisterBonusLaunch() && state.TryCatch(1, 45, true) &&
                     state.TryBeginSecondChanceTransition(45), "45-second draw transition failed.");
-                state.Tick(48); state.Tick(49); state.Tick(52);
+                double revealAt = 45 + KinoRoundState.BoardHoldSeconds + KinoRoundState.FadeSeconds;
+                double greenAt = revealAt + KinoRoundState.RevealSeconds;
+                state.Tick(48); state.Tick(revealAt); state.Tick(greenAt);
                 for (int i = 0; i < 3; i++)
-                    Check(state.TryRegisterSecondChanceLaunch(52 + i * 3) && state.TryMiss(false, true), "Second Chance failed.");
+                    Check(state.TryRegisterSecondChanceLaunch(greenAt + i * 3) && state.TryMiss(false, true), "Second Chance failed.");
                 Check(state.TryBeginShowcaseBoost(60, 25, 1), "Boost failed to start.");
                 float previous = float.PositiveInfinity;
                 for (int i = 0; i < 25; i++)

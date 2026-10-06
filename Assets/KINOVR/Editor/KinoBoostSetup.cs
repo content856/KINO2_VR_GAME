@@ -108,6 +108,7 @@ namespace KinoVR.Editor
                 if (oldBacking) Object.DestroyImmediate(oldBacking.gameObject);
                 presentation.panels = presentation.panels.Where(p => p).ToArray();
                 foreach (var light in presentation.goldAccents.GetComponentsInChildren<Light>(true)) light.intensity = 1.2f;
+                KinoExperienceSetup.ConfigureBoostHeader(presentation);
                 return;
             }
             presentation = round.gameObject.AddComponent<KinoBoostPresentation>();
@@ -192,6 +193,7 @@ namespace KinoVR.Editor
             }
             presentation.goldAccents = accents;
             accents.SetActive(false);
+            KinoExperienceSetup.ConfigureBoostHeader(presentation);
             EditorUtility.SetDirty(round);
         }
 

@@ -209,6 +209,7 @@ namespace KinoVR.Editor
                 Check(VisibleAlpha(flow.kinoLogo, flow.content) < .001f,
                     "A duplicate KINO logo appeared after mode selection or on the final score.");
                 ValidateBoardPresentation(flow);
+                if (flow.round.boostPresentation.IsBoostActive) ValidateBoostHeader(flow.round);
                 if (flow.Stage < KinoExperienceStage.Gameplay || flow.Stage >= KinoExperienceStage.Finale)
                     Check(!flow.round.IsRunning && flow.round.launcher.ActiveBallCount == 0, "Balls outside gameplay.");
                 Check(!flow.round.restartButton.IsVisible, "Player restart visible in guided session.");
@@ -510,6 +511,28 @@ namespace KinoVR.Editor
             var canvas = flow.Stage == KinoExperienceStage.Finale ? flow.contentCanvas :
                 flow.round.secondChancePresentation.announcementCanvas;
             ValidateBoardOverlay(flow.round, canvas);
+        }
+
+        public static void ValidateBoostHeader(KinoRoundController round)
+        {
+            var boost = round.boostPresentation;
+            bool announcing = boost.announcement.gameObject.activeInHierarchy;
+            Check(announcing != boost.activeBadge.activeInHierarchy, "BOOST announcement and active header overlap or both disappeared.");
+            Check(round.board.NumbersVisible && round.board.numberGrid.alpha > .999f, "BOOST hid the live number field.");
+            var boardRect = (RectTransform)round.board.transform;
+            var fieldCorners = new Vector3[4];
+            round.board.numberField.GetWorldCorners(fieldCorners);
+            float numberTop = fieldCorners.Max(corner => boardRect.InverseTransformPoint(corner).y);
+            var group = announcing ? boost.announcement.transform : boost.activeBadge.transform;
+            var corners = new Vector3[4];
+            ((RectTransform)group).GetWorldCorners(corners);
+            Check(corners.All(corner => boardRect.InverseTransformPoint(corner).y > numberTop &&
+                Mathf.Abs(boardRect.InverseTransformPoint(corner).x) < 180), "BOOST escaped the clear central header bay.");
+            foreach (var text in group.GetComponentsInChildren<TMPro.TMP_Text>())
+            {
+                text.ForceMeshUpdate();
+                Check(!text.isTextOverflowing, "BOOST header text overflows: " + text.name);
+            }
         }
 
         public static void ValidateBoardOverlay(KinoRoundController round, Canvas canvas)
