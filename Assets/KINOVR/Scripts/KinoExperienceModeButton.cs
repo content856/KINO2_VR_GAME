@@ -9,11 +9,12 @@ namespace KinoVR
     {
         public KinoExperienceController experience;
         public bool includeBoost;
+        public bool startSelectedMode;
         public Button button;
         public BoxCollider pressArea;
         float readyAt;
         public bool CanPress => gameObject.activeInHierarchy && experience && experience.isActiveAndEnabled &&
-            experience.Stage == KinoExperienceStage.ModeSelection && Time.unscaledTime >= readyAt;
+            experience.Stage == (startSelectedMode ? KinoExperienceStage.Standby : KinoExperienceStage.ModeSelection) && Time.unscaledTime >= readyAt;
 
         void Awake() { if (button) button.onClick.AddListener(Press); }
         void OnDestroy() { if (button) button.onClick.RemoveListener(Press); }
@@ -27,7 +28,7 @@ namespace KinoVR
         public void Press()
         {
             if (!CanPress) return;
-            if (includeBoost) experience.BeginBoostSession(); else experience.BeginNormalSession();
+            if (startSelectedMode) experience.StartSelectedSession(); else experience.SelectMode(includeBoost);
         }
         void OnTriggerEnter(Collider other)
         {

@@ -164,11 +164,11 @@ namespace KinoVR.Editor
                 state.Begin(0);
                 double now = 0;
                 foreach (float duration in new[] { flow.startupSeconds, flow.safetySeconds,
-                    flow.BrandingDuration, flow.introductionSeconds })
+                    flow.introductionSeconds, flow.kinoSplashSeconds })
                 {
                     now += duration + .01;
                     state.Advance(now, flow.startupSeconds, flow.safetySeconds, flow.BrandingDuration,
-                        flow.introductionSeconds, flow.finaleSeconds, flow.closingSeconds, false);
+                        flow.introductionSeconds, flow.kinoSplashSeconds, flow.finaleSeconds, flow.closingSeconds, false);
                 }
                 if (!state.BeginSecondChance(now) || !state.Finish(now + 1))
                     throw new InvalidOperationException("Could not reach Finale through the session state machine.");

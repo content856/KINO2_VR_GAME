@@ -15,7 +15,7 @@ namespace KinoVR.Editor
         public const string Output = "Artifacts/ExperienceFlow";
         const string FontPath = "Assets/KINOVR/Fonts/ExperienceGreek.asset";
 
-        [MenuItem("Tools/KINO VR/Experience/1 - Apply eight-stage flow")]
+        [MenuItem("Tools/KINO VR/Experience/1 - Apply visitor flow")]
         public static void Apply()
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) throw new InvalidOperationException("Exit Play first.");
@@ -24,6 +24,7 @@ namespace KinoVR.Editor
             var font = PrepareFont();
             var allwyn = PrepareTexture("AllwynOnBlack");
             var kino = PrepareTexture("KinoLogo");
+            ConfigureApplicationSplash(kino);
             var root = PrefabUtility.LoadPrefabContents(PrefabPath);
             try
             {
@@ -39,7 +40,16 @@ namespace KinoVR.Editor
                 flow.goldScoreMaterial = PrepareGoldText(font);
                 if (flow.allwynLogo.texture != allwyn) flow.brandingSeconds = 3;
                 flow.allwynLogo.texture = allwyn;
+                flow.kinoLogo.texture = kino;
                 if (!flow.modeCanvas) BuildModeSelection(flow, font);
+                if (!flow.startButton)
+                {
+                    flow.startButton = ModeButton(flow, font, false, Vector2.zero);
+                    flow.startButton.name = "Start selected experience";
+                    flow.startButton.startSelectedMode = true;
+                    flow.startButton.transform.Find("Mode label").GetComponent<TMP_Text>().text = "ΞΕΚΙΝΑ";
+                    flow.startButton.transform.Find("Mode hint").GetComponent<TMP_Text>().text = "Άγγιξε για να παίξεις";
+                }
                 flow.enclosure = ConfigureEnclosure(root);
                 flow.closingSeconds = 5;
                 RemoveChild(flow.contentCanvas.transform, "Quiet background");
@@ -62,7 +72,7 @@ namespace KinoVR.Editor
             finally { PrefabUtility.UnloadPrefabContents(root); }
             AssetDatabase.SaveAssets();
             Validate();
-            Debug.Log("KINO eight-stage experience configured.");
+            Debug.Log("KINO visitor flow with retained mode and static KINO splash configured.");
         }
         static TMP_FontAsset PrepareFont()
         {
@@ -89,6 +99,11 @@ namespace KinoVR.Editor
             string path = "Assets/KINOVR/Textures/Experience/" + name + ".png";
             var importer = (TextureImporter)AssetImporter.GetAtPath(path);
             if (!importer) throw new InvalidOperationException(path + " is missing.");
+            if (name == "KinoLogo")
+            {
+                importer.textureType = TextureImporterType.Sprite;
+                importer.spriteImportMode = SpriteImportMode.Single;
+            }
             importer.alphaIsTransparency = true; importer.mipmapEnabled = true;
             importer.npotScale = TextureImporterNPOTScale.None; importer.wrapMode = TextureWrapMode.Clamp;
             importer.filterMode = FilterMode.Trilinear; importer.anisoLevel = 8;
@@ -98,6 +113,19 @@ namespace KinoVR.Editor
             android.overridden = true; android.maxTextureSize = 2048; android.format = TextureImporterFormat.ASTC_4x4;
             importer.SetPlatformTextureSettings(android); importer.SaveAndReimport();
             return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+        }
+        static void ConfigureApplicationSplash(Texture2D kino)
+        {
+            var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(AssetDatabase.GetAssetPath(kino));
+            Require(sprite, "KINO splash sprite is missing.");
+            PlayerSettings.SplashScreen.show = true;
+            PlayerSettings.SplashScreen.showUnityLogo = false;
+            PlayerSettings.SplashScreen.animationMode = PlayerSettings.SplashScreen.AnimationMode.Static;
+            PlayerSettings.SplashScreen.backgroundColor = Color.black;
+            PlayerSettings.SplashScreen.background = null;
+            PlayerSettings.SplashScreen.backgroundPortrait = null;
+            PlayerSettings.SplashScreen.logos = new[] { PlayerSettings.SplashScreenLogo.Create(3, sprite) };
+            PlayerSettings.virtualRealitySplashScreen = kino;
         }
         static Material PrepareGoldText(TMP_FontAsset font)
         {
@@ -344,12 +372,20 @@ namespace KinoVR.Editor
             Require(!ShaderUtil.ShaderHasError(flow.enclosure.fadeMaterial.shader), "Enclosure shader error.");
             Require(flow.closingSeconds == 5 && round.secondChancePresentation.enclosure == flow.enclosure && round.secondChancePresentation.announcementCanvas,
                 "Missing automatic reset timing or spherical Second Chance presentation.");
-            Require(flow.contentCanvas.renderMode == RenderMode.WorldSpace && flow.modeCanvas && flow.normalModeButton && flow.boostModeButton, "Missing VR mode selection.");
+            Require(flow.contentCanvas.renderMode == RenderMode.WorldSpace && flow.modeCanvas && flow.normalModeButton && flow.boostModeButton &&
+                flow.startButton && flow.startButton.startSelectedMode, "Missing VR mode selection or standby start button.");
+            Require(flow.kinoSplashSeconds >= 1, "Every visitor must see the KINO splash before gameplay.");
+            var logos = PlayerSettings.SplashScreen.logos;
+            Require(PlayerSettings.SplashScreen.show && !PlayerSettings.SplashScreen.showUnityLogo &&
+                PlayerSettings.SplashScreen.animationMode == PlayerSettings.SplashScreen.AnimationMode.Static &&
+                logos.Length == 1 && logos[0].logo && logos[0].logo.texture == flow.kinoLogo.texture &&
+                PlayerSettings.virtualRealitySplashScreen == flow.kinoLogo.texture,
+                "Application splash must show static KINO artwork instead of the Unity logo, including VR.");
             Require(flow.body.font.HasCharacters(flow.safetyText, out uint[] missing, true, false), "Missing Greek safety glyphs.");
             KinoExperienceTests.ValidateState();
             KinoSecondChanceTests.ValidateRules();
             Directory.CreateDirectory(Output);
-            File.WriteAllText(Output + "/validation.txt", "PASS: session references, supplied logos, Greek text, startup guards, Normal/Boost selection, 360-degree background/fades, five-second closing, flow and round rules.\n");
+            File.WriteAllText(Output + "/validation.txt", "PASS: session references, static KINO application/VR splash without Unity logo, Greek text, startup guards, operator mode selection, standby start button, per-visitor KINO splash, retained mode, 360-degree background/fades, five-second closing, flow and round rules.\n");
         }
         static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
         public static void ApplyBatch() { Apply(); }

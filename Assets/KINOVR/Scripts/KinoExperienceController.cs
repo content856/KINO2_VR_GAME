@@ -29,12 +29,14 @@ namespace KinoVR
         [Min(1)] public float safetySeconds = 12;
         [Tooltip("Duration of the Allwyn introduction, including its fade in/out.")]
         [Min(1)] public float brandingSeconds = 3;
-        [HideInInspector] public float logoBlackSeconds = .5f;
+        [Min(0)] public float logoBlackSeconds = .5f;
         [Min(.1f)] public float logoFadeSeconds = .65f;
-        public float BrandingDuration => brandingSeconds;
+        public float BrandingDuration => brandingSeconds * 2 + logoBlackSeconds;
         [Min(1)] public float introductionSeconds = 6;
+        [Tooltip("Static KINO logo shown after the welcome, before every visitor's game.")]
+        [Min(1)] public float kinoSplashSeconds = 3;
         [Min(1)] public float finaleSeconds = 10;
-        [Tooltip("Time from showing the removal instruction until the next visitor's mode selection.")]
+        [Tooltip("Time from showing the removal instruction until standby, retaining the selected mode.")]
         [Min(2)] public float closingSeconds = 5;
         [Header("Replace this draft before production")]
         public string safetyVersion = "placeholder-v1";
@@ -64,13 +66,14 @@ namespace KinoVR
         [Range(1.2f, 3)] public float contentWidth = 2.2f;
         public Canvas modeCanvas;
         public KinoExperienceModeButton normalModeButton, boostModeButton;
+        public KinoExperienceModeButton startButton;
         [Tooltip("Direct-touch controls, anchored once in front of the seated player.")]
         public Vector3 modeViewOffset = new Vector3(0, -.18f, .46f);
         public KinoExperienceStage Stage => State.Stage;
         public KinoExperienceState State { get; } = new KinoExperienceState();
         public KinoSessionRecord Record { get; private set; }
         public string LastStorageError { get; private set; }
-        bool initialized, mounted, awaitingTrackedView;
+        bool initialized, mounted, awaitingTrackedView, initialBrandingShown;
         OVRCameraRig trackedRig;
         KinoModeHands modeHands;
         KinoFinalePanel finalePanel;
@@ -116,6 +119,7 @@ namespace KinoVR
                 panel.SetActive(false);
             }
             SetBlackout(1);
+            SetAudio(0);
             if (content) content.alpha = 0;
         }
         void OnEnable()
@@ -125,7 +129,7 @@ namespace KinoVR
             if (trackedRig) trackedRig.UpdatedAnchors += AnchorsUpdated;
             if (initialized)
             {
-                State.Reset(clock);
+                State.Suspend(clock);
                 if (mounted) awaitingTrackedView = true;
             }
         }
@@ -142,9 +146,11 @@ namespace KinoVR
             mounted = false;
             awaitingTrackedView = false;
             if (!initialized) return;
-            if (Record != null && string.IsNullOrEmpty(Record.completedUtc) && Stage != KinoExperienceStage.ModeSelection) { Record.abortedUtc = Utc; SaveRecord(); }
+            if (Record != null && string.IsNullOrEmpty(Record.completedUtc) && string.IsNullOrEmpty(Record.abortedUtc) &&
+                Stage != KinoExperienceStage.Waiting && Stage != KinoExperienceStage.ModeSelection && Stage != KinoExperienceStage.Standby)
+            { Record.abortedUtc = Utc; SaveRecord(); }
             StopRound();
-            State.Reset(clock);
+            State.Suspend(clock);
             if (content) content.alpha = 0;
             if (modeCanvas) modeCanvas.gameObject.SetActive(false);
             modeHands?.SetVisible(false);
@@ -155,7 +161,7 @@ namespace KinoVR
         [ContextMenu("Show Normal / Boost selection")]
         public void ShowModeSelection()
         {
-            if (!isActiveAndEnabled || !round || (Stage != KinoExperienceStage.Waiting && Stage != KinoExperienceStage.Complete)) return;
+            if (!isActiveAndEnabled || !round || (Stage != KinoExperienceStage.Waiting && Stage != KinoExperienceStage.Complete && Stage != KinoExperienceStage.Standby)) return;
             mounted = true;
             awaitingTrackedView = false;
             StopRound();
@@ -165,6 +171,28 @@ namespace KinoVR
             State.SelectMode(clock);
             PresentStage();
         }
+        public void SelectMode(bool withBoost)
+        {
+            if (!isActiveAndEnabled || Stage != KinoExperienceStage.ModeSelection) return;
+            round.showcaseBoostAfterSecondChance = withBoost;
+            State.ChooseMode(clock, withBoost);
+            PresentStage();
+        }
+        [ContextMenu("Start selected session from standby")]
+        public void StartSelectedSession()
+        {
+            if (Stage == KinoExperienceStage.Standby && State.HasSelectedMode) BeginSelectedSession(State.IncludeBoost);
+        }
+        void ShowStandby()
+        {
+            awaitingTrackedView = false;
+            StopRound();
+            if (round.score) round.score.ResetScore();
+            if (round.board) round.board.ResetBoard();
+            round.showcaseBoostAfterSecondChance = State.IncludeBoost;
+            State.Standby(clock);
+            PresentStage();
+        }
         [ContextMenu("Begin Normal session")]
         public void BeginNormalSession() => BeginSelectedSession(false);
         [ContextMenu("Begin session with Boost")]
@@ -172,7 +200,7 @@ namespace KinoVR
         public void BeginSession() => BeginNormalSession();
         void BeginSelectedSession(bool withBoost)
         {
-            if (!isActiveAndEnabled || !round || (Stage != KinoExperienceStage.Waiting && Stage != KinoExperienceStage.Complete && Stage != KinoExperienceStage.ModeSelection)) return;
+            if (!isActiveAndEnabled || !round || (Stage != KinoExperienceStage.Waiting && Stage != KinoExperienceStage.Complete && Stage != KinoExperienceStage.ModeSelection && Stage != KinoExperienceStage.Standby)) return;
             mounted = true;
             awaitingTrackedView = false;
             StopRound();
@@ -203,17 +231,18 @@ namespace KinoVR
             // No fast-forward after app suspension; each screen remains observable.
             clock += Math.Min(Time.unscaledDeltaTime, .1f);
             // Complete is observable for one frame so receipts and completion events finish
-            // exactly once. A new visitor can then choose a mode without a headset cycle.
-            if (Stage == KinoExperienceStage.Complete) { ShowModeSelection(); return; }
+            // exactly once. Standby keeps the operator's mode for the next visitor.
+            if (Stage == KinoExperienceStage.Complete) { ShowStandby(); return; }
             if (Stage == KinoExperienceStage.Gameplay && round.State.Phase >= KinoRoundPhase.BoardHold &&
                 round.State.Phase <= KinoRoundPhase.SecondChance && State.BeginSecondChance(clock)) PresentStage();
             if (Stage == KinoExperienceStage.SecondChance && (round.State.Phase == KinoRoundPhase.BoostIntro || round.State.Phase == KinoRoundPhase.Boost ||
                 round.State.Phase == KinoRoundPhase.BoostSettling) && State.BeginBoost(clock)) PresentStage();
             var previous = Stage;
             if (State.Advance(clock, startupSeconds, safetySeconds, BrandingDuration, introductionSeconds,
-                finaleSeconds, closingSeconds, requireExternalSafetyConfirmation))
+                kinoSplashSeconds, finaleSeconds, closingSeconds, requireExternalSafetyConfirmation))
             {
                 if (previous == KinoExperienceStage.Safety) { Record.safetyElapsedUtc = Utc; SaveRecord(); }
+                if (previous == KinoExperienceStage.Branding) initialBrandingShown = true;
                 PresentStage();
             }
             AnimateStage();
@@ -237,15 +266,21 @@ namespace KinoVR
         {
             if (!content) return;
             bool overlay = Stage == KinoExperienceStage.ModeSelection || Stage == KinoExperienceStage.Safety || Stage == KinoExperienceStage.Branding ||
-                Stage == KinoExperienceStage.Introduction || Stage == KinoExperienceStage.Finale || Stage == KinoExperienceStage.Closing;
+                Stage == KinoExperienceStage.Introduction || Stage == KinoExperienceStage.KinoSplash || Stage == KinoExperienceStage.Standby ||
+                Stage == KinoExperienceStage.Finale || Stage == KinoExperienceStage.Closing;
             content.alpha = overlay ? 1 : 0;
             ApplyBackground();
             PositionContent();
             if (modeCanvas)
             {
-                modeCanvas.gameObject.SetActive(Stage == KinoExperienceStage.ModeSelection);
+                modeCanvas.gameObject.SetActive(Stage == KinoExperienceStage.ModeSelection || Stage == KinoExperienceStage.Standby);
                 if (Stage == KinoExperienceStage.ModeSelection) { PositionModeSelection(); normalModeButton.Show(); boostModeButton.Show(); }
                 else { normalModeButton.Hide(); boostModeButton.Hide(); }
+                if (startButton)
+                {
+                    if (Stage == KinoExperienceStage.Standby) { PositionModeSelection(); startButton.Show(); }
+                    else startButton.Hide();
+                }
             }
             allwynLogo.gameObject.SetActive(false);
             kinoLogo.gameObject.SetActive(false);
@@ -254,11 +289,14 @@ namespace KinoVR
             body.color = Color.white;
             allwynLogo.rectTransform.anchoredPosition = Vector2.zero;
             allwynLogo.rectTransform.sizeDelta = new Vector2(600, 600f * allwynLogo.texture.height / allwynLogo.texture.width);
+            kinoLogo.rectTransform.anchoredPosition = Vector2.zero;
+            kinoLogo.rectTransform.sizeDelta = new Vector2(600, 600f * kinoLogo.texture.height / kinoLogo.texture.width);
             bool finale = Stage == KinoExperienceStage.Finale;
             if (round.board) round.board.SetFinaleCover(finale);
             if (finalePanel) finalePanel.gameObject.SetActive(finale);
             title.rectTransform.anchoredPosition = new Vector2(0, finale ? 165 : 225);
-            title.fontSize = finale ? 52 : 48;
+            title.rectTransform.sizeDelta = new Vector2(1100, Stage == KinoExperienceStage.Introduction ? 120 : 100);
+            title.fontSize = finale ? 52 : Stage == KinoExperienceStage.Introduction ? 42 : 48;
             title.color = finale ? KinoScreenTypography.Ivory : Color.white;
             body.rectTransform.anchoredPosition = new Vector2(0, finale ? -8 : -5);
             body.rectTransform.sizeDelta = finale ? new Vector2(360, 195) : new Vector2(1040, 330);
@@ -281,7 +319,12 @@ namespace KinoVR
                 case KinoExperienceStage.ModeSelection:
                     SetBlackout(0); SetAudio(0);
                     title.text = "ΕΠΙΛΕΞΕ ΕΜΠΕΙΡΙΑ";
-                    body.text = "Άγγιξε μία επιλογή για να ξεκινήσεις.";
+                    body.text = "Επίλεξε το παιχνίδι για τους επισκέπτες.";
+                    break;
+                case KinoExperienceStage.Standby:
+                    SetBlackout(0); SetAudio(0);
+                    title.text = "ΕΤΟΙΜΟΣ ΓΙΑ ΠΑΙΧΝΙΔΙ;";
+                    body.text = "Κάθισε άνετα.\nΆγγιξε το ΞΕΚΙΝΑ όταν είσαι έτοιμος.";
                     break;
                 case KinoExperienceStage.Startup: SetBlackout(1); SetAudio(0); break;
                 case KinoExperienceStage.Safety:
@@ -290,9 +333,13 @@ namespace KinoVR
                     Record.safetyDisplayedUtc = Utc; SaveRecord(); onSafetyDisplayed.Invoke(JsonUtility.ToJson(Record)); break;
                 case KinoExperienceStage.Branding: AnimateBranding(0); break;
                 case KinoExperienceStage.Introduction:
-                    title.text = "ΚΑΛΩΣ ΗΡΘΕΣ ΣΤΟ KINO VR";
+                    title.text = "ΚΑΛΩΣ ΗΡΘΕΣ\nΣΤΟΝ ΚΟΣΜΟ ΤΟΥ ΚΙΝΟ";
                     body.text = "Πιάσε τις μπάλες με τα χέρια σου.\nΚάθε πιάσιμο μετράει!";
                     footer.text = "Μείνε καθιστός και κράτα τα χέρια σου ελεύθερα."; break;
+                case KinoExperienceStage.KinoSplash:
+                    SetBlackout(0); SetAudio(1);
+                    kinoLogo.gameObject.SetActive(true);
+                    break;
                 case KinoExperienceStage.Gameplay:
                     SetAudio(1); round.BeginRound(); break;
                 case KinoExperienceStage.Finale:
@@ -316,7 +363,7 @@ namespace KinoVR
                 footer.text = requireExternalSafetyConfirmation && !State.ExternalConfirmation ? "Περιμένουμε επιβεβαίωση από το προσωπικό." : "Η εμπειρία ξεκινά σε λίγο.";
             if (Stage == KinoExperienceStage.Branding)
                 AnimateBranding(elapsed);
-            if (Stage == KinoExperienceStage.ModeSelection)
+            if (Stage == KinoExperienceStage.ModeSelection || Stage == KinoExperienceStage.Standby)
                 SetBlackout(1 - Mathf.SmoothStep(0, 1, elapsed / .4f));
             if (Stage == KinoExperienceStage.Gameplay)
                 SetBlackout(1 - Mathf.SmoothStep(0, 1, elapsed / .8f));
@@ -325,7 +372,7 @@ namespace KinoVR
                 SetBlackout(1 - Mathf.SmoothStep(0, 1, elapsed / 1.2f));
                 content.alpha = Mathf.Min(Mathf.Clamp01(elapsed / .8f), Mathf.Clamp01((introductionSeconds - elapsed) / .8f));
                 // Reading stays on an opaque 360-degree background. The last fade
-                // conceals the switch to the room before the first gameplay ball.
+                // conceals the switch to the static KINO splash before gameplay.
                 SetBlackout(Mathf.Max(BlackoutAlpha, Mathf.SmoothStep(0, 1, (elapsed - introductionSeconds + .5f) / .5f)));
                 SetAudio(Mathf.SmoothStep(0, 1, elapsed / 2));
             }
@@ -345,7 +392,8 @@ namespace KinoVR
         {
             if (!enclosure) return;
             bool instructions = Stage == KinoExperienceStage.ModeSelection || Stage == KinoExperienceStage.Safety ||
-                Stage == KinoExperienceStage.Branding || Stage == KinoExperienceStage.Introduction;
+                Stage == KinoExperienceStage.Branding || Stage == KinoExperienceStage.Introduction ||
+                Stage == KinoExperienceStage.Standby || Stage == KinoExperienceStage.KinoSplash;
             float alpha = Stage == KinoExperienceStage.Finale ? 1 - Mathf.Clamp01(finaleBackgroundTransparency / 100) :
                 Stage == KinoExperienceStage.Closing ? 1 - Mathf.Clamp01(closingBackgroundTransparency / 100) : instructions ? 1 : 0;
             enclosure.SetBackground(alpha);
@@ -384,13 +432,16 @@ namespace KinoVR
         }
         void AnimateBranding(float elapsed)
         {
-            // KINO is already on the board; only the Allwyn introduction remains.
+            // Application entry only. Each visitor also sees the separate static KINO splash.
             content.alpha = 1;
             allwynLogo.gameObject.SetActive(elapsed < brandingSeconds);
-            kinoLogo.gameObject.SetActive(false);
+            float kinoElapsed = elapsed - brandingSeconds - logoBlackSeconds;
+            kinoLogo.gameObject.SetActive(kinoElapsed >= 0 && kinoElapsed < brandingSeconds);
             float fade = Mathf.Min(logoFadeSeconds, brandingSeconds * .45f);
             float alpha = Mathf.Min(Mathf.Clamp01(elapsed / fade), Mathf.Clamp01((brandingSeconds - elapsed) / fade));
             allwynLogo.color = new Color(1, 1, 1, alpha);
+            float kinoAlpha = Mathf.Min(Mathf.Clamp01(kinoElapsed / fade), Mathf.Clamp01((brandingSeconds - kinoElapsed) / fade));
+            kinoLogo.color = new Color(1, 1, 1, kinoAlpha);
         }
         void LateUpdate()
         {
@@ -400,7 +451,12 @@ namespace KinoVR
                 bool desktop = Application.isEditor && !XRSettings.isDeviceActive;
                 if (desktop || lastAnchorFrame == Time.frameCount &&
                     device.TryGetFeatureValue(CommonUsages.isTracked, out bool tracked) && tracked)
-                    ShowModeSelection();
+                {
+                    awaitingTrackedView = false;
+                    if (State.HasSelectedMode) ShowStandby();
+                    else if (initialBrandingShown) ShowModeSelection();
+                    else { State.BeginBranding(clock); PresentStage(); }
+                }
             }
             modeHands?.SetVisible(enclosure && enclosure.BackgroundAlpha > 0 && mounted);
         }
@@ -440,7 +496,8 @@ namespace KinoVR
         {
             OVRManager.HMDMounted -= Mounted; OVRManager.HMDUnmounted -= Unmounted;
             if (trackedRig) trackedRig.UpdatedAnchors -= AnchorsUpdated;
-            if (Record != null && string.IsNullOrEmpty(Record.completedUtc) && Stage != KinoExperienceStage.Waiting && Stage != KinoExperienceStage.ModeSelection)
+            if (Record != null && string.IsNullOrEmpty(Record.completedUtc) && string.IsNullOrEmpty(Record.abortedUtc) &&
+                Stage != KinoExperienceStage.Waiting && Stage != KinoExperienceStage.ModeSelection && Stage != KinoExperienceStage.Standby)
             { Record.abortedUtc = Utc; SaveRecord(); }
             StopRound(); SetAudio(1);
             modeHands?.SetVisible(false);
