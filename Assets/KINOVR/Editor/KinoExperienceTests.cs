@@ -172,6 +172,9 @@ namespace KinoVR.Editor
             started = true; remountPending = bootAllwyn = bootKino = false; results = closed = 0; completedSession = null;
             Directory.CreateDirectory(KinoExperienceSetup.Output);
             flow.writeLocalRecords = false;
+            // The full Normal/Boost path stays covered for its January return.
+            flow.offerBoostSelection = true;
+            Check(flow.ReadyIndex >= 0, "The session test needs the Ready step enabled in the experience sequence.");
             flow.startupSeconds = 1; flow.safetySeconds = 2;
             flow.brandingSeconds = 1.6f; flow.logoBlackSeconds = .7f; flow.logoFadeSeconds = .35f;
             flow.introductionSeconds = 2; flow.finaleSeconds = 2;
@@ -222,7 +225,7 @@ namespace KinoVR.Editor
                 if (flow.Stage == KinoExperienceStage.Waiting) return;
                 if (!started) Initialize(flow);
                 if (completionPending) { VerifyAutomaticReturn(flow); return; }
-                if (flow.Stage == KinoExperienceStage.Branding)
+                if (flow.Stage == KinoExperienceStage.AllwynLogo || flow.Stage == KinoExperienceStage.KinoLogo)
                 {
                     Check(run == 0 && flow.Record == null && !flow.round.IsRunning && flow.round.launcher.ActiveBallCount == 0,
                         "Boot branding replayed within a visitor session.");
@@ -259,6 +262,10 @@ namespace KinoVR.Editor
                         KinoMainSpecialTests.CatchAndCheck(flow.round, catchable);
                 }
                 float elapsed = (float)(GetClock(flow) - flow.State.EnteredAt);
+                ValidateWaves(flow, elapsed);
+                if (flow.Stage == KinoExperienceStage.Gameplay && elapsed < flow.roundStartDelay - .1f)
+                    Check(!flow.round.IsRunning && flow.round.launcher.ActiveBallCount == 0 && (!flow.waves || flow.BlackoutAlpha < .001f),
+                        "Balls launched before the start delay, or the revealed room went black.");
                 if (flow.Stage == KinoExperienceStage.Safety && elapsed > 1 && !captured.Contains("Enclosure-360"))
                 {
                     ValidateEnclosureViews(flow); captured.Add("Enclosure-360");
@@ -297,7 +304,7 @@ namespace KinoVR.Editor
         }
         static void CheckEndings(KinoExperienceController flow)
         {
-            if (flow.Stage == KinoExperienceStage.Waiting || flow.Stage == KinoExperienceStage.Branding) return;
+            if (flow.Stage == KinoExperienceStage.Waiting || flow.Stage == KinoExperienceStage.AllwynLogo || flow.Stage == KinoExperienceStage.KinoLogo) return;
             if (!started)
             {
                 started = true; captured.Clear();
@@ -308,7 +315,7 @@ namespace KinoVR.Editor
                 flow.finaleSeconds = 4;
                 flow.BeginNormalSession();
                 double now = GetClock(flow);
-                for (int i = 0; i < 4; i++) flow.State.Advance(now, 0, 0, 0, 0, 0, 0, 0, false);
+                flow.State.Go(KinoExperienceStage.Gameplay, now);
                 flow.State.BeginSecondChance(now);
                 typeof(KinoExperienceController).GetMethod("FinishSessionRound", System.Reflection.BindingFlags.Instance |
                     System.Reflection.BindingFlags.NonPublic).Invoke(flow, null);
@@ -330,23 +337,35 @@ namespace KinoVR.Editor
                 flow.finaleBackgroundTransparency = 85;
                 captured.Add("live-setting");
             }
+            bool outro = flow.outroOnEnvironment && flow.waves && flow.waves.isActiveAndEnabled;
+            if (flow.Stage == KinoExperienceStage.Finale && outro && elapsed > flow.finaleSeconds - .1f)
+                Check(flow.BlackoutAlpha > .8f, "The level did not fade out at the end of the score before the outro.");
             if (flow.Stage == KinoExperienceStage.Closing && elapsed > 1 && captured.Add("ending-closing"))
             {
-                Check(Mathf.Abs(flow.closingBackgroundTransparency - 45) < .001f, "Removal transparency is not 45% (55% black).");
-                VerifyEndingPixels(flow, .45f);
-                Capture(flow, "Ending-remove-headset-45");
+                if (outro)
+                {
+                    Check(flow.enclosure.BackgroundAlpha > .999f && flow.BlackoutAlpha < .001f && flow.waves.LinesRendering,
+                        "Outro is not on the opaque blue environment.");
+                    Capture(flow, "Ending-outro-remove-headset");
+                }
+                else
+                {
+                    Check(Mathf.Abs(flow.closingBackgroundTransparency - 45) < .001f, "Removal transparency is not 45% (55% black).");
+                    VerifyEndingPixels(flow, .45f);
+                    Capture(flow, "Ending-remove-headset-45");
+                }
             }
             if (flow.Stage == KinoExperienceStage.Closing && elapsed >= 4.65f && captured.Add("closing-held"))
             {
-                Check(Mathf.Abs(flow.enclosure.BackgroundAlpha - .55f) < .001f && flow.BlackoutAlpha == 0,
-                    "The removal instruction's 45% transparency was overridden by the closing fade.");
-                Capture(flow, "Ending-remove-headset-45-last-moment");
+                Check(Mathf.Abs(flow.enclosure.BackgroundAlpha - (outro ? 1 : .55f)) < .001f && flow.BlackoutAlpha == 0,
+                    "The removal instruction's background was overridden by the closing fade.");
+                Capture(flow, outro ? "Ending-outro-last-moment" : "Ending-remove-headset-45-last-moment");
             }
             if (flow.Stage != KinoExperienceStage.Standby) return;
             Check(captured.Contains("ending-score") && captured.Contains("live-setting") && captured.Contains("ending-closing") && captured.Contains("closing-held"),
                 "Ending checks missed a stage or the live Inspector setting update.");
             File.AppendAllText(KinoExperienceSetup.Output + "/ending-checks.txt",
-                "PASS: score 85% visible (15% black), removal 45% visible (55% black), live setting update, original hand appearance above the background, fade covers hands, stable removal transparency until reset.\n");
+                "PASS: score 85% visible (15% black), level fade-out then remove-headset outro on the blue environment (or 45% over the room when the outro is off), live setting update, original hand appearance above the background, fade covers hands, stable removal transparency until reset.\n");
             SessionState.SetBool(Key + "Passed", true); End();
         }
         static void VerifyEndingPixels(KinoExperienceController flow, float transmission)
@@ -623,6 +642,26 @@ namespace KinoVR.Editor
         static float VisibleAlpha(RawImage logo, CanvasGroup group) =>
             logo.gameObject.activeInHierarchy ? logo.color.a * group.alpha : 0;
 
+        static void ValidateWaves(KinoExperienceController flow, float elapsed)
+        {
+            var waves = flow.waves;
+            Check(waves, "Blue wave environment is missing.");
+            bool reading = flow.Stage == KinoExperienceStage.Standby || flow.Stage == KinoExperienceStage.Startup ||
+                flow.Stage == KinoExperienceStage.Safety || flow.Stage == KinoExperienceStage.Introduction;
+            if (reading && elapsed > 1)
+                Check(waves.Visibility > .99f && waves.LinesRendering, "Wave environment is not visible behind " + flow.Stage + ".");
+            if (flow.Stage == KinoExperienceStage.Safety && elapsed > 1)
+                Check(waves.Dim > .55f && flow.safetyPanel.gameObject.activeInHierarchy, "Safety panel or dimmed environment missing.");
+            bool outro = flow.outroOnEnvironment;
+            bool playing = flow.Stage == KinoExperienceStage.Gameplay || flow.Stage == KinoExperienceStage.SecondChance ||
+                flow.Stage == KinoExperienceStage.Boost || flow.Stage == KinoExperienceStage.Finale || flow.Stage == KinoExperienceStage.Closing && !outro;
+            if (flow.Stage == KinoExperienceStage.Closing && outro && elapsed > 1)
+                Check(waves.Visibility > .99f && waves.LinesRendering && flow.enclosure.BackgroundAlpha > .999f, "Outro is not on the blue environment.");
+            if (playing) Check(!waves.LinesRendering && !waves.IsShowing, "Wave environment visible during gameplay or endings.");
+            if (flow.Stage == KinoExperienceStage.KinoSplash && elapsed > flow.kinoSplashSeconds * .75f)
+                Check(waves.Collapse > .99f, "Waves did not collapse into the beam before gameplay.");
+        }
+
         static void ValidateEnclosureViews(KinoExperienceController flow)
         {
             Check(flow.enclosure.BackgroundAlpha > .99f && flow.BlackoutAlpha < .01f,
@@ -644,6 +683,8 @@ namespace KinoVR.Editor
                 }
                 finally { Object.DestroyImmediate(forward); }
 
+                // Room-leak probes look for any light behind the enclosure, so the waves are hidden for them.
+                if (flow.waves) flow.waves.ProbeHidden = true;
                 var directions = new[] { new Vector3(0, 90, 0), new Vector3(0, 180, 0), new Vector3(0, 270, 0),
                     new Vector3(-90, 0, 0), new Vector3(90, 0, 0) };
                 var names = new[] { "Yaw90", "Yaw180", "Yaw270", "Up", "Down" };
@@ -667,7 +708,11 @@ namespace KinoVR.Editor
                     finally { Object.DestroyImmediate(frame); }
                 }
             }
-            finally { camera.transform.SetPositionAndRotation(originalPosition, originalRotation); }
+            finally
+            {
+                if (flow.waves) flow.waves.ProbeHidden = false;
+                camera.transform.SetPositionAndRotation(originalPosition, originalRotation);
+            }
         }
 
         static void ValidateEnclosureMesh(KinoExperienceController flow)
@@ -722,28 +767,39 @@ namespace KinoVR.Editor
             float allwyn = VisibleAlpha(flow.allwynLogo, flow.content), kino = VisibleAlpha(flow.kinoLogo, flow.content);
             Check(allwyn < .001f || kino < .001f, "Application logos overlap.");
             Check(flow.enclosure.BackgroundAlpha > .99f && flow.content.alpha > .99f,
-                "Branding does not have an opaque black enclosure.");
+                "Branding does not have an opaque enclosure.");
             Check(flow.title.text == "" && flow.body.text == "" && flow.footer.text == "", "Branding has extra screen text.");
-            if (elapsed > flow.logoFadeSeconds && elapsed < flow.brandingSeconds - flow.logoFadeSeconds)
+            if (elapsed <= flow.logoFadeSeconds || elapsed >= flow.brandingSeconds - flow.logoFadeSeconds) return;
+            if (flow.Stage == KinoExperienceStage.AllwynLogo)
             {
                 Check(allwyn > .99f && kino < .001f && flow.allwynLogo.rectTransform.anchoredPosition.sqrMagnitude < .01f,
-                    "Allwyn is not centered during branding.");
+                    "Allwyn is not centered during its logo step.");
                 CaptureOnce(flow, "Branding-Allwyn");
                 bootAllwyn = true;
             }
-            float kinoElapsed = elapsed - flow.brandingSeconds - flow.logoBlackSeconds;
-            if (kinoElapsed > flow.logoFadeSeconds && kinoElapsed < flow.brandingSeconds - flow.logoFadeSeconds)
+            else
             {
-                Check(kino > .99f && allwyn < .001f, "KINO is missing from application branding.");
+                Check(kino > .99f && allwyn < .001f, "KINO is missing from its logo step.");
+                Check(!flow.vrExperienceLogo || flow.vrExperienceLogo.gameObject.activeInHierarchy, "VR EXPERIENCE mark missing under KINO.");
                 CaptureOnce(flow, "Branding-KINO");
                 bootKino = true;
             }
         }
 
+        static bool StepEnabled(KinoExperienceController flow, KinoSequenceStep step) =>
+            flow.preGame.Concat(flow.postGame).Any(entry => entry != null && entry.enabled && entry.step == step);
+
         static void ValidateKinoSplash(KinoExperienceController flow)
         {
-            Check(VisibleAlpha(flow.kinoLogo, flow.content) > .999f && flow.BlackoutAlpha < .001f &&
-                flow.enclosure.BackgroundAlpha > .999f, "Static KINO splash is not fully visible on black.");
+            float t = (float)(GetClock(flow) - flow.State.EnteredAt) / flow.kinoSplashSeconds;
+            bool reveal = flow.waves && flow.waves.isActiveAndEnabled;
+            // With the environment, the background fades out from 50% to 90% and the logo leaves last (80% to 100%).
+            Check(flow.BlackoutAlpha < .001f, "KINO splash faded to black.");
+            if (!reveal || t < .5f)
+                Check(VisibleAlpha(flow.kinoLogo, flow.content) > .999f && flow.enclosure.BackgroundAlpha > .999f,
+                    "KINO splash is not fully visible on its background.");
+            if (reveal && t > .92f && t < .98f)
+                Check(flow.enclosure.BackgroundAlpha < .01f, "The room was not revealed during the KINO splash.");
             Check(!flow.allwynLogo.gameObject.activeInHierarchy && flow.title.text == "" && flow.body.text == "" && flow.footer.text == "",
                 "Static KINO splash overlaps text or another logo.");
             var rect = flow.kinoLogo.rectTransform;
@@ -757,19 +813,23 @@ namespace KinoVR.Editor
 
         static void VerifyCompletedSession(KinoExperienceController flow)
         {
+            // Expected order follows the editable sequence: the steps below Ready, the game, then the post-game steps.
             var expected = new List<KinoExperienceStage>();
             if (run < 2) expected.Add(KinoExperienceStage.ModeSelection);
-            expected.AddRange(new[] { KinoExperienceStage.Standby, KinoExperienceStage.Startup,
-                KinoExperienceStage.Safety, KinoExperienceStage.Introduction, KinoExperienceStage.KinoSplash,
-                KinoExperienceStage.Gameplay, KinoExperienceStage.SecondChance });
+            expected.AddRange(new[] { KinoExperienceStage.Standby, KinoExperienceStage.Startup });
+            for (int i = flow.ReadyIndex + 1; i < flow.preGame.Count; i++)
+                if (flow.preGame[i].enabled) expected.Add(KinoSequence.StageFor(flow.preGame[i].step));
+            expected.AddRange(new[] { KinoExperienceStage.Gameplay, KinoExperienceStage.SecondChance });
             if (run > 0) expected.Add(KinoExperienceStage.Boost);
-            expected.AddRange(new[] { KinoExperienceStage.Finale, KinoExperienceStage.Closing, KinoExperienceStage.Complete });
+            foreach (var entry in flow.postGame) if (entry.enabled) expected.Add(KinoSequence.StageFor(entry.step));
+            expected.Add(KinoExperienceStage.Complete);
             Check(visited.SequenceEqual(expected), "Session order changed: " + string.Join(",", visited));
             foreach (var phase in new[] { KinoRoundPhase.Main, KinoRoundPhase.Bonus, KinoRoundPhase.BoardHold, KinoRoundPhase.FadeOut,
                 KinoRoundPhase.SecondChanceReveal, KinoRoundPhase.SecondChance }) Check(phases.Contains(phase), "Round phase missing: " + phase);
             Check(phases.Contains(KinoRoundPhase.BoostIntro) == (run > 0), "BOOST introduction missing or shown in Normal mode.");
-            Check(bootAllwyn && bootKino && captured.Contains("KinoSplash"), "Boot logos or per-visitor KINO splash were not observable.");
-            Check(captured.Contains("Enclosure-360"), "360-degree opaque instruction enclosure was not verified.");
+            Check((bootAllwyn || !StepEnabled(flow, KinoSequenceStep.AllwynLogo)) && (bootKino || !StepEnabled(flow, KinoSequenceStep.KinoLogo)) &&
+                (captured.Contains("KinoSplash") || !StepEnabled(flow, KinoSequenceStep.KinoSplash)), "Boot logos or per-visitor KINO splash were not observable.");
+            Check(captured.Contains("Enclosure-360") || !StepEnabled(flow, KinoSequenceStep.Safety), "360-degree opaque instruction enclosure was not verified.");
             Check(results == run + 1 && closed == run + 1, "Result or close event repeated/missing.");
             Check(flow.Record.externalConfirmationUtc == null && flow.Record.safetyElapsedUtc != null, "Timed safety mislabeled.");
             Check(flow.Record.normalCatches == 20 && flow.Record.secondChanceCatches == 3 && flow.round.State.BonusCaughtNumber != 0,
@@ -809,7 +869,7 @@ namespace KinoVR.Editor
                 "Normal skips Boost; selected Boost follows all greens, holds its introduction with zero balls and a full timer, restores numbers and its small header, and adds +3 per catch; " +
                 "one result/close event per session; result mode and Boost score; safety record semantics; text fit; " +
                 "floor-bound 360-degree enclosure at world origin; opaque instruction pixels verified at yaw 90/180/270 and straight up/down; " +
-                "black/silent completion; five real-second closing instruction; automatic standby with retained mode and unchanged records/events; " +
+                "blue wave environment behind standby/safety/welcome, dimmed under the safety panel, collapsed before gameplay and absent during play; black/silent completion; five real-second closing instruction; automatic standby with retained mode and unchanged records/events; " +
                 "fresh visitor session, abort and remount retaining Boost.\n");
             SessionState.SetBool(Key + "Passed", true); End();
         }
@@ -829,16 +889,31 @@ namespace KinoVR.Editor
         {
             var camera = flow.round.playerView.desktopCamera;
             if (!camera) return;
-            var target = new RenderTexture(1600, 1000, 24);
+            // Render like the headset: an explicit sRGB target (no double gamma) and the head camera's
+            // HDR, post-processing and anti-aliasing settings instead of the desktop camera's own.
+            var head = flow.round.playerView.head ? flow.round.playerView.head.GetComponent<Camera>() : null;
+            var data = camera.GetComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>();
+            var headData = head ? head.GetComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>() : null;
+            bool hdr = camera.allowHDR, post = data && data.renderPostProcessing;
+            var aa = data ? data.antialiasing : UnityEngine.Rendering.Universal.AntialiasingMode.None;
+            var descriptor = new RenderTextureDescriptor(1600, 1000, RenderTextureFormat.ARGB32, 24) { sRGB = true, msaaSamples = 4 };
+            var target = new RenderTexture(descriptor);
             var old = camera.targetTexture; var active = RenderTexture.active;
-            var image = new Texture2D(1600, 1000, TextureFormat.RGB24, false);
+            var image = new Texture2D(1600, 1000, TextureFormat.RGB24, false, false);
             try
             {
+                if (head) camera.allowHDR = head.allowHDR;
+                if (data && headData) { data.renderPostProcessing = headData.renderPostProcessing; data.antialiasing = headData.antialiasing; }
                 Canvas.ForceUpdateCanvases(); camera.targetTexture = target; camera.Render(); RenderTexture.active = target;
                 image.ReadPixels(new Rect(0, 0, 1600, 1000), 0, 0); image.Apply();
                 File.WriteAllBytes(KinoExperienceSetup.Output + "/" + name + ".png", image.EncodeToPNG());
             }
-            finally { camera.targetTexture = old; RenderTexture.active = active; Object.DestroyImmediate(image); target.Release(); Object.DestroyImmediate(target); }
+            finally
+            {
+                camera.allowHDR = hdr;
+                if (data) { data.renderPostProcessing = post; data.antialiasing = aa; }
+                camera.targetTexture = old; RenderTexture.active = active; Object.DestroyImmediate(image); target.Release(); Object.DestroyImmediate(target);
+            }
         }
 
         static void End()

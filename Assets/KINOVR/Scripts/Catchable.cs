@@ -83,7 +83,10 @@ public class Catchable : MonoBehaviour
 
         var feedback = IsKinoBonus && kinoBonusCatchVFX ? kinoBonusCatchVFX :
             IsSecondChance && secondChanceCatchVFX ? secondChanceCatchVFX : catchVFX;
-        if (feedback != null)
+        // Pooled GPU burst in the ball's colour; the legacy prefab effect is the fallback.
+        var burst = KinoCatchBurst.Instance;
+        if (burst && burst.isActiveAndEnabled) burst.Emit(transform.position, ballType);
+        else if (feedback != null)
         {
             var effect = Instantiate(feedback, transform.position, Quaternion.identity);
             Destroy(effect, 5);

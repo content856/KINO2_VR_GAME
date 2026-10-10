@@ -35,7 +35,7 @@ namespace KinoVR
         readonly System.Random variations = new System.Random(7419);
         KinoRoundPhase phase;
         bool hasPhase, initialized, suspended;
-        float boostBlend, duck = 1, idleBlend = 1;
+        float boostBlend, duck = 1, idleBlend = 1, fakeOut = 1;
         double nextBirdAt, duckUntil, finishAt = -1;
         int countdownSecond = -1;
 
@@ -255,10 +255,15 @@ namespace KinoVR
             bool speech = announcement && announcement.isPlaying;
             duck = Mathf.MoveTowards(duck, speech ? .28f : now < duckUntil ? .55f : 1, dt * (speech ? 6 : 2));
             idleBlend = Mathf.MoveTowards(idleBlend, idle ? 1 : 0, dt * .8f);
-            if (chillMusic) chillMusic.volume = sessionVolume * musicVolume * (1 - boostBlend) * duck;
+            // Second Chance fake-out: the music fades out with the room, as if the game were over,
+            // and returns with the announcement.
+            bool fakeEnding = phase == KinoRoundPhase.FadeOut;
+            float fadeLength = round ? round.State.FadeOutDuration : KinoRoundState.FadeOutSeconds;
+            fakeOut = Mathf.MoveTowards(fakeOut, fakeEnding ? 0 : 1, dt / (fakeEnding ? Mathf.Max(.1f, fadeLength) : 1.2f));
+            if (chillMusic) chillMusic.volume = sessionVolume * musicVolume * (1 - boostBlend) * duck * fakeOut;
             if (boostMusic)
             {
-                boostMusic.volume = sessionVolume * musicVolume * boostBlend * duck;
+                boostMusic.volume = sessionVolume * musicVolume * boostBlend * duck * fakeOut;
                 if (!boosting && boostBlend == 0 && boostMusic.isPlaying) boostMusic.Stop();
             }
             if (outdoorAmbience) outdoorAmbience.volume = sessionVolume * ambienceVolume * Mathf.Lerp(.25f, 1, idleBlend);

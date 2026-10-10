@@ -25,6 +25,7 @@ namespace KinoVR.Editor
             var allwyn = PrepareTexture("AllwynOnBlack");
             var kino = PrepareTexture("KinoLogo");
             ConfigureApplicationSplash(kino);
+            ConfigureAppIdentity();
             var root = PrefabUtility.LoadPrefabContents(PrefabPath);
             try
             {
@@ -51,6 +52,7 @@ namespace KinoVR.Editor
                     flow.startButton.transform.Find("Mode hint").GetComponent<TMP_Text>().text = "Άγγιξε για να παίξεις";
                 }
                 flow.enclosure = ConfigureEnclosure(root);
+                KinoWaveEnvironmentSetup.Configure(root, flow, font);
                 flow.closingSeconds = 5;
                 RemoveChild(flow.contentCanvas.transform, "Quiet background");
                 RemoveChild(root.transform, "Session blackout");
@@ -72,7 +74,7 @@ namespace KinoVR.Editor
             finally { PrefabUtility.UnloadPrefabContents(root); }
             AssetDatabase.SaveAssets();
             Validate();
-            Debug.Log("KINO visitor flow with retained mode and static KINO splash configured.");
+            Debug.Log("KINO visitor flow with blue wave environment, direct ΞΕΚΙΝΑ start and no splash screen configured.");
         }
         static TMP_FontAsset PrepareFont()
         {
@@ -114,18 +116,39 @@ namespace KinoVR.Editor
             importer.SetPlatformTextureSettings(android); importer.SaveAndReimport();
             return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
         }
+        // Name and package shown on the headset (replaces the URP template's Unity identifiers).
+        public const string AppName = "KINO VR";
+        public const string CompanyName = "Digital Tribes";
+        public const string PackageId = "com.digitaltribes.kinovr";
+        static void ConfigureAppIdentity()
+        {
+            PlayerSettings.productName = AppName;
+            PlayerSettings.companyName = CompanyName;
+            PlayerSettings.SetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.Android, PackageId);
+            PlayerSettings.SetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.Standalone, PackageId);
+        }
+        // No splash screen: the app opens straight into the KINO VR experience (the KINO logo step).
         static void ConfigureApplicationSplash(Texture2D kino)
         {
-            var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(AssetDatabase.GetAssetPath(kino));
-            Require(sprite, "KINO splash sprite is missing.");
-            PlayerSettings.SplashScreen.show = true;
+            PlayerSettings.SplashScreen.show = false;
             PlayerSettings.SplashScreen.showUnityLogo = false;
-            PlayerSettings.SplashScreen.animationMode = PlayerSettings.SplashScreen.AnimationMode.Static;
-            PlayerSettings.SplashScreen.backgroundColor = Color.black;
+            PlayerSettings.SplashScreen.logos = new PlayerSettings.SplashScreenLogo[0];
             PlayerSettings.SplashScreen.background = null;
             PlayerSettings.SplashScreen.backgroundPortrait = null;
-            PlayerSettings.SplashScreen.logos = new[] { PlayerSettings.SplashScreenLogo.Create(3, sprite) };
-            PlayerSettings.virtualRealitySplashScreen = kino;
+            PlayerSettings.SplashScreen.backgroundColor = Color.black;
+            PlayerSettings.virtualRealitySplashScreen = null;
+            var config = AssetDatabase.LoadAssetAtPath<ScriptableObject>("Assets/Oculus/OculusProjectConfig.asset");
+            if (config)
+            {
+                var settings = new SerializedObject(config);
+                var splash = settings.FindProperty("systemSplashScreen");
+                if (splash != null) splash.objectReferenceValue = null;
+                // Hands only: the experience never uses controllers, and with controllers allowed the
+                // headset keeps controller mode until they are put down, delaying the hands.
+                var hands = settings.FindProperty("handTrackingSupport");
+                if (hands != null) hands.intValue = 2;
+                if (settings.ApplyModifiedPropertiesWithoutUndo()) EditorUtility.SetDirty(config);
+            }
         }
         static Material PrepareGoldText(TMP_FontAsset font)
         {
@@ -375,17 +398,17 @@ namespace KinoVR.Editor
             Require(flow.contentCanvas.renderMode == RenderMode.WorldSpace && flow.modeCanvas && flow.normalModeButton && flow.boostModeButton &&
                 flow.startButton && flow.startButton.startSelectedMode, "Missing VR mode selection or standby start button.");
             Require(flow.kinoSplashSeconds >= 1, "Every visitor must see the KINO splash before gameplay.");
-            var logos = PlayerSettings.SplashScreen.logos;
-            Require(PlayerSettings.SplashScreen.show && !PlayerSettings.SplashScreen.showUnityLogo &&
-                PlayerSettings.SplashScreen.animationMode == PlayerSettings.SplashScreen.AnimationMode.Static &&
-                logos.Length == 1 && logos[0].logo && logos[0].logo.texture == flow.kinoLogo.texture &&
-                PlayerSettings.virtualRealitySplashScreen == flow.kinoLogo.texture,
-                "Application splash must show static KINO artwork instead of the Unity logo, including VR.");
+            Require(PlayerSettings.productName == AppName && PlayerSettings.companyName == CompanyName &&
+                PlayerSettings.GetApplicationIdentifier(UnityEditor.Build.NamedBuildTarget.Android) == PackageId,
+                "App name, company or Android package is not the KINO VR identity.");
+            Require(!PlayerSettings.SplashScreen.show && !PlayerSettings.virtualRealitySplashScreen,
+                "The app must start without a splash screen, directly in the KINO VR experience.");
             Require(flow.body.font.HasCharacters(flow.safetyText, out uint[] missing, true, false), "Missing Greek safety glyphs.");
+            KinoWaveEnvironmentSetup.Validate(flow);
             KinoExperienceTests.ValidateState();
             KinoSecondChanceTests.ValidateRules();
             Directory.CreateDirectory(Output);
-            File.WriteAllText(Output + "/validation.txt", "PASS: session references, static KINO application/VR splash without Unity logo, Greek text, startup guards, operator mode selection, standby start button, per-visitor KINO splash, retained mode, 360-degree background/fades, five-second closing, flow and round rules.\n");
+            File.WriteAllText(Output + "/validation.txt", "PASS: session references, no splash screen (straight into the experience), Greek text, startup guards, blue wave environment and brand fonts, KINO Boost inactive at launch with a single activation for every visitor and no menu (operator mode selection retained behind offerBoostSelection), editable pre/post-game sequence, outro on the environment, standby start button, per-visitor KINO splash, retained mode, 360-degree background/fades, five-second closing, flow and round rules.\n");
         }
         static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
         public static void ApplyBatch() { Apply(); }

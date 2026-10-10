@@ -10,10 +10,34 @@ namespace KinoVR
         public const int BonusMultiplier = 3;
         public const int NormalBallLimit = 20;
         public const int SecondChanceBallLimit = 3;
+        // Second Chance fake-out defaults: the board holds, the room fades slowly to black and
+        // stays black as if the game were over, then the announcement fades in for reading.
         public const float BoardHoldSeconds = 3;
-        public const float FadeSeconds = 1.5f;
+        public const float FadeOutSeconds = 3.5f;
+        public const float BlackHoldSeconds = 1.5f;
+        /// <summary>Whole FadeOut phase: the fade plus the black hold.</summary>
+        public const float FadeSeconds = FadeOutSeconds + BlackHoldSeconds;
+        public const float RevealFadeSeconds = 1;
+        public const float ReadingSeconds = 4.5f;
         // Includes the fade back in, followed by two seconds of fully visible artwork.
-        public const float RevealSeconds = FadeSeconds + 2;
+        /// <summary>Whole SecondChanceReveal phase: fade in plus reading time. Greens launch when it ends.</summary>
+        public const float RevealSeconds = RevealFadeSeconds + ReadingSeconds;
+        public float BoardHoldDuration { get; private set; } = BoardHoldSeconds;
+        public float FadeOutDuration { get; private set; } = FadeOutSeconds;
+        public float BlackHoldDuration { get; private set; } = BlackHoldSeconds;
+        public float RevealFadeDuration { get; private set; } = RevealFadeSeconds;
+        public float ReadingDuration { get; private set; } = ReadingSeconds;
+        public float FadePhaseDuration => FadeOutDuration + BlackHoldDuration;
+        public float RevealPhaseDuration => RevealFadeDuration + ReadingDuration;
+        /// <summary>Adjustable fake-out timing (seconds), kept within safe minimums.</summary>
+        public void SetSecondChanceTiming(float boardHold, float fadeOut, float blackHold, float revealFade, float reading)
+        {
+            BoardHoldDuration = Math.Max(0, boardHold);
+            FadeOutDuration = Math.Max(.1f, fadeOut);
+            BlackHoldDuration = Math.Max(0, blackHold);
+            RevealFadeDuration = Math.Max(.1f, revealFade);
+            ReadingDuration = Math.Max(.5f, reading);
+        }
         public const float SecondChanceInterval = 3;
         readonly HashSet<int> numbers = new HashSet<int>();
         readonly List<int> caughtNumbers = new List<int>(NormalBallLimit);
@@ -158,11 +182,11 @@ namespace KinoVR
             else MultiplierRemainingSeconds = (float)Math.Max(0, multiplierDeadline - now);
             // Keep each transition observable for at least one rendered frame, even
             // when a frame stalls. No balls can launch behind the blackout/title.
-            if (Phase == KinoRoundPhase.BoardHold && now - PhaseStartedAt >= BoardHoldSeconds)
+            if (Phase == KinoRoundPhase.BoardHold && now - PhaseStartedAt >= BoardHoldDuration)
                 EnterPhase(KinoRoundPhase.FadeOut, now);
-            else if (Phase == KinoRoundPhase.FadeOut && now - PhaseStartedAt >= FadeSeconds)
+            else if (Phase == KinoRoundPhase.FadeOut && now - PhaseStartedAt >= FadePhaseDuration)
                 EnterPhase(KinoRoundPhase.SecondChanceReveal, now);
-            else if (Phase == KinoRoundPhase.SecondChanceReveal && now - PhaseStartedAt >= RevealSeconds)
+            else if (Phase == KinoRoundPhase.SecondChanceReveal && now - PhaseStartedAt >= RevealPhaseDuration)
                 EnterPhase(KinoRoundPhase.SecondChance, now);
             else if (Phase == KinoRoundPhase.BoostIntro && now - PhaseStartedAt >= boostIntroSeconds)
             {

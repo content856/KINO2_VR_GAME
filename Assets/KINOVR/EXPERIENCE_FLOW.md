@@ -45,6 +45,48 @@ Use **Tools > KINO VR > Main specials > 1 - Apply glow, Mystery and contact feed
 
 Original PPTX/PDF/SVG files are in `SourceArt/Experience`. `Textures/Experience` contains transparent, proportion-preserving logo renders. `AllwynOnBlack.png` is derived from the supplied SVG: it keeps the geometry and cyan symbol, with a white wordmark for contrast on black. The original SVG and original-color `AllwynLogo.png` remain preserved. KINO follows Allwyn sequentially, never simultaneously during branding. `brandingSeconds`, `logoBlackSeconds` and `logoFadeSeconds` control the logo timing. A prebuilt Greek font atlas prevents missing glyphs and runtime font generation. Safety replacements must use characters covered by the atlas.
 
+## Blue wave environment and direct start (pre-game)
+
+Every pre-game screen now sits inside the animated blue environment from the UX storyboard (`UIUX/before game/storyboard`): glowing ribbons of wave lines and drifting particles around the seated player, over a navy gradient on the enclosure shell. `KinoWaveEnvironment` builds three meshes once (about 128 lines, 360 particles and the sky) and animates everything in the `KINO/Wave Lines`, `KINO/Wave Particles` and `KINO/Wave Sky` shaders, so the CPU only updates three property blocks per frame. Every animated term is a whole number of cycles per 120 seconds and every ring frequency is a whole number around 360°, so the loop and the ring are seamless. The ribbons sit 4.4 to 5.6 metres away with constant angular line width, stay calmer straight ahead where the reading panels sit, and are placed once per appearance from the head's heading. They draw after the black background and before the hands and reading canvases (sorting 55/60/61), use `ZTest Always` with additive colour, preserve destination alpha and are stereo-instancing safe. The black background and every fade still behave as before; the fade covers the environment.
+
+Visitor flow: KINO Boost is inactive at launch and there are no mode buttons. `includeBoost` (off) is the post-launch activation: switched on, the existing Boost wave runs after Second Chance for every visitor with no choice. `offerBoostSelection` (off) keeps the NORMAL / ΜΕ BOOST operator menu hidden. Visitors go from the KINO logo straight to **ΕΤΟΙΜΟΣ ΓΙΑ ΠΑΙΧΝΙΔΙ;** with the ΞΕΚΙΝΑ touch button. The play test turns the operator menu on so both the Normal and Boost paths stay covered.
+
+### Editable sequence
+
+**Tools > KINO VR > Experience Sequence** opens a small window that edits `preGame` and `postGame` on `KinoTimedGameplay.prefab` (or the live controller in Play mode): drag rows to reorder, tick to enable, and set each screen's duration. Before the game: Allwyn logo (off by default), KINO + VR EXPERIENCE logos, Ready screen, Safety, Welcome, KINO splash. After the game: Final score, Remove headset (outro). The main round, Second Chance and the Boost toggle sit between the two lists. Steps above the Ready screen play once when the app starts; steps below it play for every visitor. With Ready off, every visitor gets the whole list and the game starts and loops automatically. The window warns when Ready or Safety is off, or when Safety is above Ready (it then plays once at app start and writes no session record). Logo steps share `brandingSeconds`.
+
+| Stage | Environment | Screen |
+|---|---|---|
+| Headset on | Lines draw outward from the front over 1.8 s while the fade lifts | |
+| KINO logo (app entry) | Full, slightly dimmed | KINO above the chrome VR EXPERIENCE mark (Allwyn step off by default) |
+| Standby | Full | KINO + VR EXPERIENCE logos, ready text, ΞΕΚΙΝΑ near the hands |
+| Startup | Dimmed, no black | |
+| Safety | Dimmed 60% | Glass panel, small KINO logo, reading-time bar for `safetySeconds` |
+| Introduction | Full | KINO logo, ΚΑΛΩΣ ΗΡΘΕΣ / ΣΤΟΝ ΚΟΣΜΟ ΤΟΥ ΚΙΝΟ (second line in KINO yellow) |
+| KINO splash | Ribbons collapse into a beam behind the logo, flash, then clear | Static KINO logo (unchanged) |
+| Gameplay, Second Chance, Boost | Hidden | Unchanged; Boost runs only after its activation |
+| Final score | Hidden; the level fades to black over the last 0.6 s when the outro follows | Score over the room (85% visible) |
+| Remove headset (outro) | Full, opaque, lines draw out again | KINO logo, Η ΕΜΠΕΙΡΙΑ ΟΛΟΚΛΗΡΩΘΗΚΕ, removal instruction, Ευχαριστούμε που έπαιξες! (`outroOnEnvironment`; off restores the 45% room view) |
+
+Pre-game text uses the CF Asty brand fonts (`Fonts/CFAstyStd-Bold SDF`, `CFAstyStd-Book SDF`, static Greek atlases with `ExperienceGreek` as fallback). The final score keeps its original font and gold material. Inspector controls on `KinoWaveEnvironment`: intensity, density (line-count multiplier), speed, calm-front amplitude, height offset, the three blues, particle count and the fade/dim/reveal timings. **Tools > KINO VR > Experience > 5 - Apply blue wave environment** runs the full visitor-flow setup, which now also adds the environment, materials, fonts, VR EXPERIENCE logo, glass panel and reading bar. Validation covers shaders, materials, Greek glyphs in the brand fonts and the hidden Boost menu; the play test checks the environment behind standby/safety/welcome, the dim under the safety panel, the collapse before gameplay and its absence during play, and hides it for the room-leak pixel probes. Fill rate on Quest 3 still needs a headset profiler capture; lower `density` or `particleCount` if it is tight.
+
+### Splash, particles, catch effects and the start button
+
+- **Safety copy** (`safetyVersion` v1, `placeholderSafety` off): the temporary-text footer is gone and the footer reads Η εμπειρία ξεκινά σε λίγο. Setup replaces the prototype placeholder once; later edits in the Inspector are kept.
+- **No splash screen**: the Unity splash, the VR splash image and the Meta system splash are all off, so the app opens straight into the experience on the KINO logo step. `KinoSplashBlue.png` is unused and can be deleted.
+- **Into the game**: during the KINO splash the ribbons collapse into a single beam; as it forms (50% to 90% of the splash) the navy sky and the enclosure fade away to reveal the room, the beam clears and the logo leaves last. There is no fade to black. Gameplay then waits `roundStartDelay` (2 s) in the revealed room before the first ball launches.
+- **Environment particles**: 700 ambient motes (`particleCount`) plus 320 riders (`riderCount`) that stream along the ribbons in whole laps per loop, follow the collapse into the beam and flare with the flash. One draw call for both.
+- **Score popups**: no dark outline or shadow (a runtime copy of the popup material), and each number takes its ball's colour: yellow +1, gold +2, purple Mystery multiplier, green, red and amber +3 for Second Chance, the KINO bonus and Boost. Colours are on `KinoCatchFeedback`.
+- **Catch effect**: `KinoCatchBurst` replaces the per-catch `Instantiate`/`Destroy` of the old Explosion prefab with sixteen pooled GPU bursts (streaking sparks with drag and gravity, a shockwave ring, a core flash) in one draw call, 64 sparks per burst (two thirds fast streaks, one third slow lingering glitter), coloured per ball: KINO gold, bright gold for glow balls, purple for Mystery, green for Second Chance, red for the KINO bonus, amber for Boost. Special balls burst larger. The prefab effects remain as the fallback when the component is absent.
+- **Placement (Meta guidance)**: ΞΕΚΙΝΑ sits 46 cm from the eyes, 14 cm below eye height (`touchDistance`, `touchDrop`), the far end of Meta's 42 to 46 cm direct-touch range. Reading panels stay at 2.5 m: beyond Meta's 0.5 m minimum for prolonged reading and outside the 0.5 to 0.8 m touch/ray hand-off zone. Validation enforces both.
+- **Start button**: a KINO-blue glass pill with CF Asty lettering that breathes while waiting, brightens and grows as a tracked hand approaches and bursts into gold sparks on press (`KinoStartButtonVisual`). Touch and click handling are unchanged.
+
+### Second Chance fake-out
+
+When the main round ends the player should believe the game is over. The final board holds (3 s), the room and the music fade slowly to black (3.5 s), the view stays black and silent (1.5 s), then the Second Chance announcement fades in (1 s) and stays fully visible for reading (4.5 s) before the first green ball launches. All five durations are on `KinoRoundController` and in **Tools > KINO VR > Experience Sequence**, which also shows when the black screen, the announcement and the first green ball happen; changes apply from the next round. The announcement position on the board is unchanged.
+
+The ΞΕΚΙΝΑ button is a 9 x 4.5 cm pill (about 11 x 5.6 degrees at 46 cm) with a slightly larger touch area; the small hint under the label is hidden at this size.
+
 ## Checks
 
 Use **Tools > KINO VR > Experience > 1 - Apply eight-stage flow**, **2 - Validate flow**, and **3 - Test and capture sessions**. Reports/images go to `Artifacts/ExperienceFlow`. The experience checks cover both modes, enclosure geometry and black coverage in multiple viewing directions, and automatic return to mode selection. Round regression tests disable the session controller to exercise standalone showcase/restart behavior. Actual hand tracking, headset presence, stereo readability, audio and comfort still need Quest testing.

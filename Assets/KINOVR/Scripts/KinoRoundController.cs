@@ -16,6 +16,17 @@ namespace KinoVR
         [Header("Client showcase (normal cycle ends after Second Chance)")]
         public bool showcaseBoostAfterSecondChance = false;
         [HideInInspector] public KinoExperienceController experience;
+        [Header("Second Chance fake-out (seconds; also in Tools > KINO VR > Experience Sequence)")]
+        [Tooltip("Final board stays visible after the last ball.")]
+        [Min(0)] public float secondChanceBoardHold = KinoRoundState.BoardHoldSeconds;
+        [Tooltip("Slow fade to black, as if the game were over. The music fades with it.")]
+        [Min(.1f)] public float secondChanceFadeOut = KinoRoundState.FadeOutSeconds;
+        [Tooltip("Silence in black before Second Chance appears.")]
+        [Min(0)] public float secondChanceBlackHold = KinoRoundState.BlackHoldSeconds;
+        [Tooltip("Fade back in on the Second Chance announcement.")]
+        [Min(.1f)] public float secondChanceRevealFade = KinoRoundState.RevealFadeSeconds;
+        [Tooltip("Announcement fully visible for reading; the first green ball launches when it ends.")]
+        [Min(.5f)] public float secondChanceReading = KinoRoundState.ReadingSeconds;
         [Min(1)] public float showcaseBoostDuration = 25;
         [Min(.25f)] public float showcaseBoostInterval = 1;
         // The gold presentation is used only by the optional client showcase.
@@ -42,6 +53,7 @@ namespace KinoVR
         {
             if (launcher) launcher.StopLaunching(true);
             State.Begin(duration, Time.timeAsDouble, enableMainSpecialBalls ? (int?)Random.Range(0, int.MaxValue) : null);
+            State.SetSecondChanceTiming(secondChanceBoardHold, secondChanceFadeOut, secondChanceBlackHold, secondChanceRevealFade, secondChanceReading);
             if (catchFeedback) catchFeedback.ResetFeedback(playerView ? playerView.View : null);
             finishPresented = false;
             if (restartButton) restartButton.Hide();

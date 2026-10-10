@@ -2,7 +2,7 @@ using System;
 
 namespace KinoVR
 {
-    public enum KinoExperienceStage { Waiting, ModeSelection, Startup, Safety, Branding, Introduction, Gameplay, SecondChance, Boost, Finale, Closing, Complete, Standby, KinoSplash }
+    public enum KinoExperienceStage { Waiting, ModeSelection, Startup, Safety, Branding, Introduction, Gameplay, SecondChance, Boost, Finale, Closing, Complete, Standby, KinoSplash, AllwynLogo, KinoLogo }
 
     // Session clock is independent of ball scoring and uses elapsed, unscaled time.
     public sealed class KinoExperienceState
@@ -17,6 +17,10 @@ namespace KinoVR
         public void ChooseMode(double now, bool withBoost) { HasSelectedMode = true; IncludeBoost = withBoost; Standby(now); }
         public void Standby(double now) { ExternalConfirmation = false; Enter(KinoExperienceStage.Standby, now); }
         public void Begin(double now, bool withBoost = false) { ExternalConfirmation = false; HasSelectedMode = true; IncludeBoost = withBoost; Enter(KinoExperienceStage.Startup, now); }
+        /// <summary>Enters a stage chosen by the controller's editable sequence.</summary>
+        public void Go(KinoExperienceStage stage, double now) { if (stage == KinoExperienceStage.Safety) ExternalConfirmation = false; Enter(stage, now); }
+        /// <summary>Fixes the session mode without an operator menu.</summary>
+        public void SetMode(bool withBoost) { IncludeBoost = withBoost; HasSelectedMode = true; }
         public void Suspend(double now) { ExternalConfirmation = false; Enter(KinoExperienceStage.Waiting, now); }
         public void Reset(double now) { ExternalConfirmation = IncludeBoost = HasSelectedMode = false; Enter(KinoExperienceStage.Waiting, now); }
         public bool ConfirmSafety()

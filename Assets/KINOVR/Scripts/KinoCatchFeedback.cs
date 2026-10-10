@@ -21,13 +21,32 @@ namespace KinoVR
         public string LastText { get; private set; }
         public Vector3 LastContactPoint { get; private set; }
         public int ShownCount { get; private set; }
-        static readonly Color Gold = new Color(1, .87f, .24f);
-        static readonly Color Mystery = new Color(.85f, .69f, 1);
+        [Header("Popup colours match the balls (no outline)")]
+        public Color normalBall = new Color(1f, .86f, .22f);
+        public Color glowBall = new Color(1f, .7f, .16f);
+        public Color mysteryBall = new Color(.8f, .62f, 1f);
+        public Color secondChanceBall = new Color(.36f, 1f, .5f);
+        public Color bonusBall = new Color(1f, .3f, .3f);
+        public Color boostBall = new Color(1f, .62f, .2f);
+        [Tooltip("Floating Mystery multiplier countdown below the view. Off: the multiplier shows only as the catch popup and on the board.")]
+        public bool showMultiplierTimer;
+        Material cleanMaterial;
+        Color Mystery => mysteryBall;
 
         void Awake() => Warm();
         void Warm()
         {
             if (timer || !font) return;
+            // Runtime copy of the popup material without the dark outline or shadow, so the
+            // numbers read in their own ball colour. The shared asset is left untouched.
+            var source = textMaterial ? textMaterial : font.material;
+            cleanMaterial = new Material(source) { name = source.name + " (no outline)", hideFlags = HideFlags.DontSave };
+            cleanMaterial.SetFloat("_OutlineWidth", 0);
+            cleanMaterial.SetFloat("_OutlineSoftness", 0);
+            cleanMaterial.DisableKeyword("OUTLINE_ON");
+            cleanMaterial.DisableKeyword("UNDERLAY_ON");
+            cleanMaterial.DisableKeyword("UNDERLAY_INNER");
+            cleanMaterial.SetFloat("_FaceDilate", .08f);
             for (int i = 0; i < Capacity; i++) labels[i] = MakeLabel("Catch popup " + i, 6);
             timer = MakeLabel("Active Mystery multiplier", 4);
         }
@@ -38,7 +57,7 @@ namespace KinoVR
             go.transform.localScale = Vector3.one * .16f;
             var label = go.AddComponent<TextMeshPro>();
             label.font = font;
-            if (textMaterial) label.fontSharedMaterial = textMaterial;
+            if (cleanMaterial) label.fontSharedMaterial = cleanMaterial;
             label.fontSize = size;
             label.alignment = TextAlignmentOptions.Center;
             label.textWrappingMode = TextWrappingModes.NoWrap;
@@ -73,7 +92,7 @@ namespace KinoVR
             var label = labels[index];
             origins[index] = position;
             born[index] = Time.time;
-            colors[index] = type == Catchable.BallType.Mystery ? Mystery : type == Catchable.BallType.MoreWins ? Gold : Color.white;
+            colors[index] = ColourFor(type);
             label.text = text;
             label.color = colors[index];
             label.transform.position = position;
@@ -81,14 +100,32 @@ namespace KinoVR
             label.gameObject.SetActive(true);
             LastText = text; LastContactPoint = position; ShownCount++;
         }
+        Color ColourFor(Catchable.BallType type)
+        {
+            switch (type)
+            {
+                case Catchable.BallType.MoreWins: return glowBall;
+                case Catchable.BallType.Mystery: return mysteryBall;
+                case Catchable.BallType.SecondChance: return secondChanceBall;
+                case Catchable.BallType.KinoBonus: return bonusBall;
+                case Catchable.BallType.KinoBoost: return boostBall;
+                default: return normalBall;
+            }
+        }
+        void OnDestroy()
+        {
+            if (!cleanMaterial) return;
+            if (Application.isPlaying) Destroy(cleanMaterial); else DestroyImmediate(cleanMaterial);
+        }
         public void Present(KinoRoundState state)
         {
             if (!timer) return;
-            bool visible = state.IsRunning && (state.Phase == KinoRoundPhase.Main || state.Phase == KinoRoundPhase.Settling) && state.ActiveMultiplier > 1;
+            bool visible = showMultiplierTimer && state.IsRunning && (state.Phase == KinoRoundPhase.Main || state.Phase == KinoRoundPhase.Settling) && state.ActiveMultiplier > 1;
             timer.gameObject.SetActive(visible);
             if (!visible) return;
+            // Same look as the Mystery catch popup: purple, no outline, with a smaller countdown.
             timer.color = Mystery;
-            timer.SetText("×{0}   {1:1}s", state.ActiveMultiplier, state.MultiplierRemainingSeconds);
+            timer.SetText("×{0}<size=55%>  {1:1}s</size>", state.ActiveMultiplier, state.MultiplierRemainingSeconds);
         }
         void Face(TMP_Text label)
         {

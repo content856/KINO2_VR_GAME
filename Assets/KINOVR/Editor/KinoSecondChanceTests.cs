@@ -63,20 +63,23 @@ namespace KinoVR.Editor
         }
         static double Reveal(KinoRoundState state, double start)
         {
+            // Fake-out timing: board hold, slow fade plus black hold, then fade-in and reading time.
+            double hold = KinoRoundState.BoardHoldSeconds, fade = KinoRoundState.FadeSeconds, reveal = KinoRoundState.RevealSeconds;
             Check(state.TryBeginSecondChanceTransition(start), "Second Chance transition rejected.");
-            state.Tick(start + 2.99);
-            Check(state.Phase == KinoRoundPhase.BoardHold && !state.TryRegisterSecondChanceLaunch(start + 2.99), "Board did not stay visible for 3 seconds.");
-            state.Tick(start + 3);
+            state.Tick(start + hold - .01);
+            Check(state.Phase == KinoRoundPhase.BoardHold && !state.TryRegisterSecondChanceLaunch(start + hold - .01), "Board did not stay visible for its hold.");
+            state.Tick(start + hold);
             Check(state.Phase == KinoRoundPhase.FadeOut, "Missing fade-out.");
-            state.Tick(start + 4.49);
-            Check(state.Phase == KinoRoundPhase.FadeOut, "Fade shorter than 1.5 seconds.");
-            state.Tick(start + 4.5);
-            Check(state.Phase == KinoRoundPhase.SecondChanceReveal && !state.TryRegisterSecondChanceLaunch(start + 4.5), "Launch behind title.");
-            state.Tick(start + 7.99);
-            Check(state.Phase == KinoRoundPhase.SecondChanceReveal && !state.TryRegisterSecondChanceLaunch(start + 7.99), "Title disappeared before the longer fade and reading hold ended.");
-            state.Tick(start + 8);
+            state.Tick(start + hold + fade - .01);
+            Check(state.Phase == KinoRoundPhase.FadeOut, "Fade and black hold ended early.");
+            state.Tick(start + hold + fade);
+            Check(state.Phase == KinoRoundPhase.SecondChanceReveal && !state.TryRegisterSecondChanceLaunch(start + hold + fade), "Launch behind title.");
+            state.Tick(start + hold + fade + reveal - .01);
+            Check(state.Phase == KinoRoundPhase.SecondChanceReveal && !state.TryRegisterSecondChanceLaunch(start + hold + fade + reveal - .01),
+                "Title disappeared before the fade-in and reading time ended.");
+            state.Tick(start + hold + fade + reveal);
             Check(state.Phase == KinoRoundPhase.SecondChance, "Missing green phase.");
-            return start + 8;
+            return start + hold + fade + reveal;
         }
         public static void ValidateRules()
         {
@@ -96,8 +99,9 @@ namespace KinoVR.Editor
             }
             Check(state.NormalLaunchCount + state.SecondChanceLaunchCount == 23 && state.Score == 15 && state.UniqueCount == 3, "20+3 quota, green +3 or memory failure.");
             Check(!state.TryRegisterSecondChanceLaunch(100), "Fourth green launch.");
-            Check(state.TryBeginShowcaseBoost(74, 25, 1, 2.2f), "Showcase introduction did not start.");
-            double boostAt = 74 + (double)2.2f;
+            double boostStart = greenAt + 2 * KinoRoundState.SecondChanceInterval + 1;
+            Check(state.TryBeginShowcaseBoost(boostStart, 25, 1, 2.2f), "Showcase introduction did not start.");
+            double boostAt = boostStart + (double)2.2f;
             Check(state.Phase == KinoRoundPhase.BoostIntro && state.RemainingSeconds == 25, "Introduction consumed Boost time.");
             state.Tick(boostAt - .001);
             Check(state.Phase == KinoRoundPhase.BoostIntro && !state.TryRegisterBoostLaunch(boostAt - .001) &&
@@ -121,9 +125,14 @@ namespace KinoVR.Editor
             Check(!state.TryBeginBonus() && state.IsRunning, "Empty main draw must still get Second Chance.");
             greenAt = Reveal(state, 60);
             for (int i = 0; i < 3; i++) { state.TryRegisterSecondChanceLaunch(greenAt + i * 3); state.TryMiss(false, true); }
-            Check(state.ResolvedSecondChanceCount == 3 && !state.TryBeginShowcaseBoost(74, 25, 1, 2.2f), "Empty eligible set started Boost.");
+            Check(state.ResolvedSecondChanceCount == 3 && !state.TryBeginShowcaseBoost(greenAt + 2 * KinoRoundState.SecondChanceInterval + 1, 25, 1, 2.2f), "Empty eligible set started Boost.");
+            var tuned = new KinoRoundState();
+            tuned.SetSecondChanceTiming(1, 2, 0, .5f, 3);
+            Check(tuned.FadePhaseDuration == 2 && tuned.RevealPhaseDuration == 3.5f, "Adjustable Second Chance timing ignored.");
+            tuned.SetSecondChanceTiming(-1, 0, -1, 0, 0);
+            Check(tuned.BoardHoldDuration == 0 && tuned.FadeOutDuration >= .1f && tuned.ReadingDuration >= .5f, "Second Chance timing minimums not enforced.");
             Directory.CreateDirectory(Folder);
-            File.WriteAllText(Folder + "/rules.txt", "PASS: normal 20 slots; last-flight grace; one red bonus before Second Chance; caught-only candidates; 3s board hold; 1.5s fade each way and 2s fully visible reading hold; reveal blocks launches; exactly 3 greens at 3s spacing; green +3; total 23 draw balls; optional timed Boost repeats caught numbers and awards +3 each catch; empty sets; deadlines; restart.\n");
+            File.WriteAllText(Folder + "/rules.txt", "PASS: normal 20 slots; last-flight grace; one red bonus before Second Chance; caught-only candidates; fake-out timing (3s board hold, 3.5s fade to black, 1.5s black hold, 1s fade-in, 4.5s reading) and adjustable timing; reveal blocks launches; exactly 3 greens at 3s spacing; green +3; total 23 draw balls; optional timed Boost repeats caught numbers and awards +3 each catch; empty sets; deadlines; restart.\n");
         }
         public static void ValidateRulesAndAssets()
         {
@@ -223,9 +232,9 @@ namespace KinoVR.Editor
                 if (state.Phase != previous)
                 {
                     events.Add($"run {run}: {previous} -> {state.Phase} at {now - startedAt:F3}s (phase {now - phaseAt:F3}s)");
-                    if (previous == KinoRoundPhase.BoardHold) Check(now - phaseAt >= 2.95, "Short board hold.");
-                    if (previous == KinoRoundPhase.FadeOut) Check(now - phaseAt >= 1.45, "Short fade.");
-                    if (previous == KinoRoundPhase.SecondChanceReveal) Check(now - phaseAt >= 3.45, "Longer reveal did not preserve its reading hold.");
+                    if (previous == KinoRoundPhase.BoardHold) Check(now - phaseAt >= state.BoardHoldDuration - .05, "Short board hold.");
+                    if (previous == KinoRoundPhase.FadeOut) Check(now - phaseAt >= state.FadePhaseDuration - .05, "Short fade and black hold.");
+                    if (previous == KinoRoundPhase.SecondChanceReveal) Check(now - phaseAt >= state.RevealPhaseDuration - .05, "Reveal did not preserve its reading time.");
                     if (state.Phase == KinoRoundPhase.SecondChanceReveal) Check(round.secondChancePresentation.announcement.activeSelf, "Missing title.");
                     if (run == 0 && state.Phase == KinoRoundPhase.SecondChanceReveal)
                     {

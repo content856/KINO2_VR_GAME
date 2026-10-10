@@ -3348,7 +3348,7 @@ ParticleSystem:
         m_RotationOrder: 4
     startSizeY:
       serializedVersion: 2
-      minMaxState: 0
+      minMaxState: 3
       scalar: 1
       minScalar: 1
       maxCurve:
@@ -3401,7 +3401,7 @@ ParticleSystem:
         m_RotationOrder: 4
     startSizeZ:
       serializedVersion: 2
-      minMaxState: 0
+      minMaxState: 3
       scalar: 1
       minScalar: 1
       maxCurve:
@@ -3454,7 +3454,7 @@ ParticleSystem:
         m_RotationOrder: 4
     startRotationX:
       serializedVersion: 2
-      minMaxState: 0
+      minMaxState: 3
       scalar: 0
       minScalar: 0
       maxCurve:
@@ -3507,7 +3507,7 @@ ParticleSystem:
         m_RotationOrder: 4
     startRotationY:
       serializedVersion: 2
-      minMaxState: 0
+      minMaxState: 3
       scalar: 0
       minScalar: 0
       maxCurve:
@@ -39074,6 +39074,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: KINO Gameplay
       objectReference: {fileID: 0}
+    - target: {fileID: 1151827303558133161, guid: 2cdf295e8f96ad04997d2ebf8a433cd5, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 1323125235070016229, guid: 2cdf295e8f96ad04997d2ebf8a433cd5, type: 3}
       propertyPath: m_fontColor32.rgba
       value: 4292791462
@@ -39146,6 +39150,10 @@ PrefabInstance:
       propertyPath: m_Enabled
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 6753008567822364511, guid: 2cdf295e8f96ad04997d2ebf8a433cd5, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 7293652742313442802, guid: 2cdf295e8f96ad04997d2ebf8a433cd5, type: 3}
       propertyPath: m_TextStyleHashCode
       value: -1183493901
@@ -39161,6 +39169,10 @@ PrefabInstance:
     - target: {fileID: 7560079395920620351, guid: 2cdf295e8f96ad04997d2ebf8a433cd5, type: 3}
       propertyPath: m_LocalRotation.z
       value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7750375171044287890, guid: 2cdf295e8f96ad04997d2ebf8a433cd5, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -0.5
       objectReference: {fileID: 0}
     - target: {fileID: 8360305904043679702, guid: 2cdf295e8f96ad04997d2ebf8a433cd5, type: 3}
       propertyPath: m_IsActive

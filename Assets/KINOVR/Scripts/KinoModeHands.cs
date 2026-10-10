@@ -20,6 +20,17 @@ namespace KinoVR
         readonly List<Hand> hands = new List<Hand>(2);
         bool disposed;
 
+        /// <summary>True once the SDK is rendering at least one tracked hand (mesh loaded, data valid).</summary>
+        public bool AnyHandVisible
+        {
+            get
+            {
+                foreach (var hand in hands)
+                    if (hand.renderer && hand.renderer.enabled && hand.renderer.sharedMesh && hand.renderer.gameObject.activeInHierarchy) return true;
+                return false;
+            }
+        }
+
         public KinoModeHands(Transform vrRig)
         {
             if (!vrRig) return;
