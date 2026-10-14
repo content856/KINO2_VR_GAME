@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
@@ -13,6 +14,7 @@ namespace KinoVR
         public Button button;
         public BoxCollider pressArea;
         float readyAt;
+        readonly HashSet<Collider> releaseBeforePress = new HashSet<Collider>();
         public bool CanPress => gameObject.activeInHierarchy && experience && experience.isActiveAndEnabled &&
             experience.Stage == (startSelectedMode ? KinoExperienceStage.Standby : KinoExperienceStage.ModeSelection) && Time.unscaledTime >= readyAt;
 
@@ -33,7 +35,29 @@ namespace KinoVR
         void OnTriggerEnter(Collider other)
         {
             var hand = other.GetComponentInParent<HandCatcher>();
-            if (CanPress && hand && hand.isActiveAndEnabled) Press();
+            if (!hand || !hand.isActiveAndEnabled) return;
+            if (startSelectedMode && experience && experience.LeaderboardEnabled)
+            {
+                if (!TouchInside(other)) { releaseBeforePress.Remove(other); return; }
+                if (releaseBeforePress.Contains(other)) return;
+                if (CanPress) Press();
+                releaseBeforePress.Add(other);
+            }
+            else if (CanPress) Press();
+        }
+        void OnTriggerExit(Collider other) => releaseBeforePress.Remove(other);
+        void OnTriggerStay(Collider other)
+        {
+            // The catch sphere is wider than a button. Use the palm centre for the online menu,
+            // where a separate Change player action sits below Start.
+            if (startSelectedMode && experience && experience.LeaderboardEnabled) OnTriggerEnter(other);
+        }
+        bool TouchInside(Collider other)
+        {
+            if (!startSelectedMode || !experience || !experience.LeaderboardEnabled || !pressArea) return true;
+            var local = pressArea.transform.InverseTransformPoint(other.bounds.center) - pressArea.center;
+            return Mathf.Abs(local.x) <= pressArea.size.x * .5f && Mathf.Abs(local.y) <= pressArea.size.y * .5f &&
+                Mathf.Abs(local.z * pressArea.transform.lossyScale.z) <= .04f;
         }
         void Update()
         {

@@ -2,7 +2,8 @@ using System;
 
 namespace KinoVR
 {
-    public enum KinoExperienceStage { Waiting, ModeSelection, Startup, Safety, Branding, Introduction, Gameplay, SecondChance, Boost, Finale, Closing, Complete, Standby, KinoSplash, AllwynLogo, KinoLogo }
+    public enum KinoExperienceStage { Waiting, ModeSelection, Startup, Safety, Branding, Introduction, Gameplay, SecondChance, Boost, Finale, Closing, Complete, Standby, KinoSplash, AllwynLogo, KinoLogo,
+        CampaignSelection, RegionSelection, StoreSelection, PlayerSelection }
 
     // Session clock is independent of ball scoring and uses elapsed, unscaled time.
     public sealed class KinoExperienceState

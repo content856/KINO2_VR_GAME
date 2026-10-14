@@ -77,7 +77,7 @@ namespace KinoVR.Editor
                         duration.floatValue = Mathf.Max(step == KinoSequenceStep.RemoveHeadset ? 2 : 1, EditorGUI.FloatField(field, "Seconds", duration.floatValue));
                         EditorGUIUtility.labelWidth = old;
                     }
-                    else EditorGUI.LabelField(field, step == KinoSequenceStep.Ready ? "waits for touch" : "", EditorStyles.miniLabel);
+                    else EditorGUI.LabelField(field, step == KinoSequenceStep.Ready ? "waits for touch" : KinoSequence.IsBackend(step) ? "waits for selection" : "", EditorStyles.miniLabel);
                 }
             };
             return list;
@@ -85,9 +85,24 @@ namespace KinoVR.Editor
 
         string Note(KinoSequenceStep step, int index)
         {
-            int ready = ReadyPosition();
-            if (ready < 0 || step == KinoSequenceStep.Ready) return "";
-            return index < ready ? "   (app start only)" : "";
+            int boundary = VisitorPosition();
+            if (KinoSequence.IsBackend(step) && !target.FindProperty("useLeaderboard").boolValue) return "   (offline: skipped)";
+            if (step == KinoSequenceStep.PlayerSelection) return "";
+            if (boundary < 0) return "";
+            return index < boundary ? "   (app start only)" : "";
+        }
+        int VisitorPosition()
+        {
+            if (target.FindProperty("useLeaderboard").boolValue)
+            {
+                var pre = target.FindProperty("preGame");
+                for (int i = 0; i < pre.arraySize; i++)
+                {
+                    var e = pre.GetArrayElementAtIndex(i);
+                    if ((KinoSequenceStep)e.FindPropertyRelative("step").enumValueIndex == KinoSequenceStep.PlayerSelection && e.FindPropertyRelative("enabled").boolValue) return i;
+                }
+            }
+            return ReadyPosition();
         }
 
         int ReadyPosition()
@@ -139,7 +154,28 @@ namespace KinoVR.Editor
             EditorGUILayout.LabelField(EditorApplication.isPlaying ? "Editing the running scene (changes are lost when Play stops)" :
                 "Editing " + KinoExperienceSetup.PrefabPath, EditorStyles.miniLabel);
             EditorGUILayout.Space(4);
-            EditorGUILayout.HelpBox("Drag to reorder, tick to enable. Steps above the Ready screen play once when the app starts; steps below it play for every visitor. The KINO logo duration is shared with the Allwyn logo.", MessageType.None);
+            var online = target.FindProperty("useLeaderboard");
+            bool wasOnline = online.boolValue;
+            using (new EditorGUI.DisabledScope(EditorApplication.isPlaying))
+            {
+                EditorGUILayout.PropertyField(online, new GUIContent("Connect tablet / leaderboard"));
+                if (online.boolValue)
+                    EditorGUILayout.PropertyField(target.FindProperty("leaderboardApiBaseUrl"), new GUIContent("Quest API URL"));
+            }
+            if (online.boolValue)
+            {
+                EditorGUILayout.HelpBox("Pairing is requested in the headset when needed. Campaign → region → store runs once per app start. Player selection starts every visitor's loop. One campaign is selected automatically. Pending scores block the next player until resolved.", MessageType.Info);
+                if (!wasOnline || GUILayout.Button("Arrange online setup before Ready"))
+                {
+                    target.ApplyModifiedProperties();
+                    Undo.RecordObject(controller, "Arrange leaderboard sequence");
+                    KinoSequence.ArrangeLeaderboard(controller.preGame);
+                    EditorUtility.SetDirty(controller); Bind();
+                }
+            }
+            EditorGUILayout.HelpBox(target.FindProperty("useLeaderboard").boolValue ?
+                "Steps above Player selection play once; Player selection and subsequent screens repeat for each visitor. Setup and player checks remain mandatory while connected." :
+                "Offline rehearsal: backend steps are skipped. Steps above Ready play once; Ready and subsequent screens repeat for each visitor.", MessageType.None);
             preList.DoLayoutList();
 
             EditorGUILayout.LabelField("The game", EditorStyles.boldLabel);
@@ -221,6 +257,12 @@ namespace KinoVR.Editor
                 EditorGUILayout.HelpBox("No screens before the game.", MessageType.Info);
             if (target.FindProperty("offerBoostSelection").boolValue)
                 EditorGUILayout.HelpBox("The operator menu is on: the KINO Boost wave follows the menu choice instead of the toggle above.", MessageType.Info);
+            if (target.FindProperty("useLeaderboard").boolValue)
+            {
+                int visitor = VisitorPosition();
+                if (ready < 0 || visitor >= ready)
+                    EditorGUILayout.HelpBox("Place Player selection before an enabled Ready screen. Backend checks cannot be bypassed by disabling or reordering the setup screens.", MessageType.Warning);
+            }
         }
     }
 }

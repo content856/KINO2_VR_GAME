@@ -19,6 +19,7 @@ namespace KinoVR
         public bool includeBoost;
         public int boostCatches;
         public int glowCatches, mysteryCatches, mainScore;
+        public string backendSessionId, registrationId, nickname, campaignId, storeId, submissionId;
     }
 
     [DefaultExecutionOrder(-300), DisallowMultipleComponent]
@@ -53,7 +54,14 @@ namespace KinoVR
         [TextArea(5, 12)] public string safetyText = DefaultSafetyText;
         [Tooltip("When enabled, the timed safety screen also waits for ConfirmSafetyFromOperator().")]
         public bool requireExternalSafetyConfirmation;
-        [Header("Local handoff; no tablet or leaderboard service is connected")]
+        [Header("Leaderboard connection")]
+        public bool useLeaderboard;
+        public bool LeaderboardEnabled => connectionInitialized ? leaderboardEnabled : useLeaderboard;
+        bool connectionInitialized, leaderboardEnabled;
+        public string leaderboardApiBaseUrl = "https://kinovr.digitaltribes.gr/api/v1";
+        public KinoBackendFlow Backend { get; private set; }
+        public bool BackendScreen => Stage >= KinoExperienceStage.CampaignSelection && Stage <= KinoExperienceStage.PlayerSelection;
+        [Header("Local session records")]
         public bool writeLocalRecords = true;
         public KinoSessionEvent onSafetyDisplayed = new KinoSessionEvent();
         public KinoSessionEvent onResultReady = new KinoSessionEvent();
@@ -91,7 +99,7 @@ namespace KinoVR
         [Tooltip("Operator NORMAL / ΜΕ BOOST menu before the ready screen. Off: no buttons, every visitor gets includeBoost.")]
         public bool offerBoostSelection;
         [Header("Sequence (Tools > KINO VR > Experience Sequence)")]
-        [Tooltip("Screens before the game. Steps above the Ready screen play once when the app starts; steps below it play for every visitor.")]
+        [Tooltip("With the leaderboard, Player selection starts the visitor loop. Campaign, region and store are selected once per app run.")]
         public List<KinoSequenceEntry> preGame = KinoSequence.DefaultPreGame();
         [Tooltip("Screens after the game, before the next visitor.")]
         public List<KinoSequenceEntry> postGame = KinoSequence.DefaultPostGame();
@@ -131,7 +139,16 @@ namespace KinoVR
                 return -1;
             }
         }
-        int VisitorStart => Mathf.Max(0, ReadyIndex);
+        public int VisitorStart
+        {
+            get
+            {
+                if (LeaderboardEnabled && preGame != null)
+                    for (int i = 0; i < preGame.Count; i++)
+                        if (preGame[i] != null && preGame[i].enabled && preGame[i].step == KinoSequenceStep.PlayerSelection) return i;
+                return Mathf.Max(0, ReadyIndex);
+            }
+        }
         Transform contentParent;
         int lastAnchorFrame = -1;
         float audioMix = 1;
@@ -142,11 +159,19 @@ namespace KinoVR
 
         void Awake()
         {
+            leaderboardEnabled = useLeaderboard; connectionInitialized = true;
             if (body) { bodyMaterial = body.fontSharedMaterial; defaultBodyFont = body.font; }
             if (title) { titleMaterial = title.fontSharedMaterial; defaultTitleFont = title.font; }
             if (footer) { footerMaterial = footer.fontSharedMaterial; defaultFooterFont = footer.font; }
             if (!round) round = GetComponent<KinoRoundController>();
             if (!round) { enabled = false; return; }
+            if (LeaderboardEnabled)
+            {
+                Backend = GetComponent<KinoBackendFlow>();
+                if (!Backend) Backend = gameObject.AddComponent<KinoBackendFlow>();
+                Backend.Initialize(this);
+                Backend.SetupRequested += ReturnToStoreSelection;
+            }
             round.experience = this;
             if (round.playerView && round.playerView.vrRig) trackedRig = round.playerView.vrRig.GetComponent<OVRCameraRig>();
             modeHands = new KinoModeHands(round.playerView && round.playerView.vrRig ? round.playerView.vrRig.transform : null);
@@ -218,6 +243,7 @@ namespace KinoVR
             mounted = false;
             awaitingTrackedView = false;
             if (!initialized) return;
+            Backend?.SuspendVisitor();
             if (SessionOpen && Stage != KinoExperienceStage.Waiting && Stage != KinoExperienceStage.ModeSelection && Stage != KinoExperienceStage.Standby)
             { Record.abortedUtc = Utc; SaveRecord(); }
             StopRound();
@@ -234,6 +260,7 @@ namespace KinoVR
         public void ShowModeSelection()
         {
             if (!isActiveAndEnabled || !round || (Stage != KinoExperienceStage.Waiting && Stage != KinoExperienceStage.Complete && Stage != KinoExperienceStage.Standby)) return;
+            if (LeaderboardEnabled && !Backend.PlayerReady) { ReturnToPlayerSelection(); return; }
             mounted = true;
             awaitingTrackedView = false;
             ResetForVisitor();
@@ -263,6 +290,14 @@ namespace KinoVR
         void BeginSelectedSession(bool withBoost)
         {
             if (!isActiveAndEnabled || !round || (Stage != KinoExperienceStage.Waiting && Stage != KinoExperienceStage.Complete && Stage != KinoExperienceStage.ModeSelection && Stage != KinoExperienceStage.Standby)) return;
+            if (LeaderboardEnabled && (!Backend.PlayerReady || Backend.Busy))
+            { if (!Backend.Busy) ReturnToPlayerSelection(); return; }
+            if (LeaderboardEnabled) { Backend.ConfirmReady(() => BeginLocalSession(withBoost)); return; }
+            BeginLocalSession(withBoost);
+        }
+        void BeginLocalSession(bool withBoost)
+        {
+            if (!isActiveAndEnabled || !round || (LeaderboardEnabled && (!mounted || !Backend.PlayerReady))) return;
             mounted = true;
             awaitingTrackedView = false;
             OpenSession(withBoost);
@@ -283,10 +318,12 @@ namespace KinoVR
             round.showcaseBoostAfterSecondChance = withBoost;
             Record = new KinoSessionRecord { sessionId = Guid.NewGuid().ToString("N"), startedUtc = Utc,
                 safetyVersion = safetyVersion, placeholderSafety = placeholderSafety, includeBoost = withBoost };
+            if (LeaderboardEnabled) Backend.BindRecord(Record);
             if (round.audioController) round.audioController.BeginSessionAudio();
         }
         void ShowReady()
         {
+            if (LeaderboardEnabled && !Backend.PlayerReady) { GatePlayer(ShowReady); return; }
             awaitingTrackedView = false;
             ResetForVisitor();
             if (offerBoostSelection && !State.HasSelectedMode)
@@ -312,9 +349,20 @@ namespace KinoVR
                 {
                     var entry = preGame[i];
                     if (entry == null || !entry.enabled || !KinoSequence.IsPreGame(entry.step)) continue;
+                    if (KinoSequence.IsBackend(entry.step) && !LeaderboardEnabled) continue;
+                    // Store setup is independent of the visitor, even when its rows are reordered.
+                    if (LeaderboardEnabled && Backend.StoreReady && KinoSequence.IsBackend(entry.step) && entry.step != KinoSequenceStep.PlayerSelection) continue;
                     sequenceIndex = i;
-                    if (ready >= 0 && i >= ready) appEntryDone = true;
+                    if (i >= VisitorStart) appEntryDone = true;
+                    if (LeaderboardEnabled && KinoSequence.IsBackend(entry.step))
+                    {
+                        State.Go(KinoSequence.StageFor(entry.step), clock); PresentStage();
+                        int current = sequenceIndex;
+                        Backend.EnterStep(entry.step, () => { if (mounted && isActiveAndEnabled && sequenceIndex == current && BackendScreen) RunPreGameFrom(current + 1); });
+                        return;
+                    }
                     if (entry.step == KinoSequenceStep.Ready) { ShowReady(); return; }
+                    if (LeaderboardEnabled && i >= VisitorStart && !Backend.PlayerReady) { int resume = i; GatePlayer(() => RunPreGameFrom(resume)); return; }
                     // Without a Ready step each visitor's session opens with the first screen.
                     if (ready < 0 && !SessionOpen) OpenSession(includeBoost);
                     State.Go(KinoSequence.StageFor(entry.step), clock);
@@ -323,6 +371,7 @@ namespace KinoVR
                 }
             sequenceIndex = preGame != null ? preGame.Count : 0;
             appEntryDone = true;
+            if (LeaderboardEnabled && !Backend.PlayerReady) { GatePlayer(() => RunPreGameFrom(preGame != null ? preGame.Count : 0)); return; }
             if (!SessionOpen) OpenSession(offerBoostSelection && State.HasSelectedMode ? State.IncludeBoost : includeBoost);
             State.Go(KinoExperienceStage.Gameplay, clock);
             PresentStage();
@@ -412,6 +461,7 @@ namespace KinoVR
             Record.secondChanceCatches = round.State.SecondChanceCatchCount;
             Record.boostCatches = round.State.BoostCatchCount;
             Record.completedUtc = Utc;
+            if (LeaderboardEnabled) Backend.SubmitResult(Record);
             SaveRecord();
             onResultReady.Invoke(JsonUtility.ToJson(Record));
             RunPostFrom(0);
@@ -484,7 +534,18 @@ namespace KinoVR
                     title.text = "ΕΤΟΙΜΟΣ ΓΙΑ ΠΑΙΧΝΙΔΙ;";
                     body.text = ReadyTouchLine;
                     LayoutReady();
+                    if (LeaderboardEnabled && Backend.ActiveSession != null)
+                    {
+                        footer.richText = false;
+                        footer.text = "Παίζεις ως: " + Backend.ActiveSession.nickname;
+                        Backend.panel?.ShowReadyActions(Backend.ChangePlayer);
+                    }
                     break;
+                case KinoExperienceStage.CampaignSelection:
+                case KinoExperienceStage.RegionSelection:
+                case KinoExperienceStage.StoreSelection:
+                case KinoExperienceStage.PlayerSelection:
+                    SetBlackout(0); SetAudio(0); break;
                 // With the environment, startup stays on the dimmed waves instead of black.
                 case KinoExperienceStage.Startup: SetBlackout(UseWaves ? 0 : 1); SetAudio(0); break;
                 case KinoExperienceStage.Safety:
@@ -604,6 +665,10 @@ namespace KinoVR
                     break;
                 case KinoExperienceStage.ModeSelection:
                 case KinoExperienceStage.Standby: waves.Drive(1, .15f); break;
+                case KinoExperienceStage.CampaignSelection:
+                case KinoExperienceStage.RegionSelection:
+                case KinoExperienceStage.StoreSelection:
+                case KinoExperienceStage.PlayerSelection: waves.Drive(1, .15f); break;
                 case KinoExperienceStage.Startup: waves.Drive(1, .45f); break;
                 case KinoExperienceStage.Safety: waves.Drive(1, .6f); break;
                 case KinoExperienceStage.Introduction: waves.Drive(1, .25f); break;
@@ -703,7 +768,7 @@ namespace KinoVR
         void ApplyBackground()
         {
             if (!enclosure) return;
-            bool instructions = Stage == KinoExperienceStage.ModeSelection || Stage == KinoExperienceStage.Safety ||
+            bool instructions = BackendScreen || Stage == KinoExperienceStage.ModeSelection || Stage == KinoExperienceStage.Safety ||
                 Stage == KinoExperienceStage.AllwynLogo || Stage == KinoExperienceStage.KinoLogo || Stage == KinoExperienceStage.Introduction ||
                 Stage == KinoExperienceStage.Standby || Stage == KinoExperienceStage.KinoSplash ||
                 Stage == KinoExperienceStage.Startup && UseWaves || Stage == KinoExperienceStage.Closing && Outro;
@@ -815,6 +880,7 @@ namespace KinoVR
         }
         void OnDisable()
         {
+            Backend?.SuspendVisitor();
             OVRManager.HMDMounted -= Mounted; OVRManager.HMDUnmounted -= Unmounted;
             if (trackedRig) trackedRig.UpdatedAnchors -= AnchorsUpdated;
             if (SessionOpen && Stage != KinoExperienceStage.Waiting && Stage != KinoExperienceStage.ModeSelection && Stage != KinoExperienceStage.Standby)
@@ -827,6 +893,26 @@ namespace KinoVR
             if (waves) waves.HideImmediately();
             SetBlackout(0);
         }
-        void OnDestroy() { modeHands?.Dispose(); if (round) round.onRoundFinished.RemoveListener(FinishSessionRound); }
+        void OnDestroy() { modeHands?.Dispose(); if (Backend) Backend.SetupRequested -= ReturnToStoreSelection; if (round) round.onRoundFinished.RemoveListener(FinishSessionRound); }
+
+        void GatePlayer(Action done)
+        {
+            State.Go(KinoExperienceStage.PlayerSelection, clock); PresentStage();
+            appEntryDone = true;
+            Backend.EnterStep(KinoSequenceStep.PlayerSelection, () => { if (mounted && isActiveAndEnabled && BackendScreen) done(); });
+        }
+        public void ReturnToPlayerSelection()
+        {
+            if (!LeaderboardEnabled || !isActiveAndEnabled || !mounted) return;
+            ResetForVisitor();
+            RunPreGameFrom(VisitorStart);
+        }
+        public void ReturnToStoreSelection()
+        {
+            if (!LeaderboardEnabled || !isActiveAndEnabled || !mounted) return;
+            ResetForVisitor(); appEntryDone = false;
+            int first = preGame.FindIndex(e => e != null && e.enabled && KinoSequence.IsBackend(e.step));
+            RunPreGameFrom(Mathf.Max(0, first));
+        }
     }
 }

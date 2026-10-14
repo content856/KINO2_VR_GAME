@@ -127,6 +127,14 @@ namespace KinoVR.Editor
         {
             KinoExperienceSetup.Validate();
             EditorSceneManager.OpenScene("Assets/KinoRotunda/Scenes/KinoRotunda.unity");
+            // These timing/visual fixtures rehearse locally; backend behavior has its own
+            // isolated API tests. Do not pair or submit synthetic gameplay to the service.
+            foreach (var flow in Object.FindObjectsByType<KinoExperienceController>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                flow.useLeaderboard = false;
+                PrefabUtility.RecordPrefabInstancePropertyModifications(flow);
+                EditorSceneManager.MarkSceneDirty(flow.gameObject.scene);
+            }
             SessionState.SetBool(Key + "RunInBackground", Application.runInBackground);
             SessionState.SetBool(Key, true); SessionState.SetBool(Key + "Exit", exit); SessionState.SetBool(Key + "Passed", false);
             DisableEditorXR();
@@ -499,7 +507,12 @@ namespace KinoVR.Editor
 
         static void SelectMode(KinoExperienceController flow)
         {
-            Check(EditorApplication.timeSinceStartup < inputDeadline, "Mode click/physical hand trigger did not start a session.");
+            // Batch startup may compile the scene's first rendered frame while the logos
+            // are visible. Bound interaction time from the first actual menu observation.
+            if (!captured.Contains("ModeSelection")) inputDeadline = EditorApplication.timeSinceStartup + 30;
+            Check(EditorApplication.timeSinceStartup < inputDeadline,
+                "Mode click/physical hand trigger did not start a session. inputSent=" + inputSent +
+                ", normalCanPress=" + flow.normalModeButton.CanPress + ", boostCanPress=" + flow.boostModeButton.CanPress);
             CaptureOnce(flow, "ModeSelection");
             Check(flow.normalModeButton.gameObject.activeInHierarchy && flow.boostModeButton.gameObject.activeInHierarchy,
                 "Mode menu is missing a choice.");

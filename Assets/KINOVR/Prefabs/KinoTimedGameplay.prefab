@@ -7873,6 +7873,8 @@ MonoBehaviour:
     \u03AE \u03B5\u03C5\u03B1\u03B9\u03C3\u03B8\u03B7\u03C3\u03AF\u03B1 \u03C3\u03C4\u03BF
     \u03C6\u03C9\u03C2."
   requireExternalSafetyConfirmation: 0
+  useLeaderboard: 1
+  leaderboardApiBaseUrl: https://kinovr.digitaltribes.gr/api/v1
   writeLocalRecords: 1
   onSafetyDisplayed:
     m_PersistentCalls:
@@ -7909,6 +7911,14 @@ MonoBehaviour:
   - step: 0
     enabled: 0
   - step: 1
+    enabled: 1
+  - step: 8
+    enabled: 1
+  - step: 9
+    enabled: 1
+  - step: 10
+    enabled: 1
+  - step: 11
     enabled: 1
   - step: 2
     enabled: 1
