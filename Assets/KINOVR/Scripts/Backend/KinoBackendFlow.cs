@@ -425,7 +425,7 @@ namespace KinoVR
             var options = Players.Select(p => Choice(p.nickname, () => ChoosePlayer(p.registration_id))).ToList();
             options.Add(Choice("Ανανέωση λίστας", () => { nextPoll = 0; }));
             options.Add(Choice("Ρυθμίσεις καταστήματος", () => { operatorMenu = true; DrawPlayers(); }));
-            Show("ΕΠΙΛΕΞΕ ΤΟ ΟΝΟΜΑ ΣΟΥ", status, options);
+            if (panel) panel.ShowPlayerSelection("ΕΠΙΛΕΞΕ ΤΟ ΟΝΟΜΑ ΣΟΥ", status, options, store != null ? store.name : campaign?.name);
         }
         void DrawError()
         {

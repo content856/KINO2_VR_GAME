@@ -14,9 +14,14 @@ namespace KinoVR
         KinoBackendPanel panel;
         Button button;
         TMP_Text label;
+        Image originalFace;
+        Transform originalAccent;
+        KinoBackendSelectionGraphic selectionFace;
+        TMP_FontAsset originalFont;
         Action selected;
-        bool available;
+        bool available, polished, hovered, appearanceInitialized;
         float readyAt;
+        float pressedUntil;
         readonly HashSet<Collider> releaseBeforePress = new HashSet<Collider>();
         internal BoxCollider PressArea { get; private set; }
 
@@ -25,17 +30,61 @@ namespace KinoVR
             panel = owner;
             button = target;
             label = caption;
+            originalFont = caption.font;
+            originalFace = target.targetGraphic as Image;
+            originalAccent = transform.Find("Accent");
             PressArea = area;
             button.onClick.AddListener(PressFromPointer);
         }
 
         internal void Configure(string text, Action action, bool enabled)
         {
-            label.text = text ?? string.Empty;
+            var caption = text ?? string.Empty;
+            if (label.text != caption) label.text = caption;
             selected = action;
             available = enabled && action != null;
             label.color = available ? KinoBackendPanel.Ivory : KinoBackendPanel.Muted;
             button.interactable = CanPress;
+            RefreshAppearance();
+        }
+
+        internal void SetAppearance(bool useSelectionStyle, TMP_FontAsset font = null, bool arrow = false)
+        {
+            var desiredFont = useSelectionStyle && font ? font : originalFont;
+            if (appearanceInitialized && polished == useSelectionStyle && label.font == desiredFont &&
+                (!selectionFace || selectionFace.showArrow == arrow)) return;
+            appearanceInitialized = true;
+            polished = useSelectionStyle;
+            if (polished && !selectionFace)
+            {
+                var go = new GameObject("Rounded selection surface", typeof(RectTransform), typeof(KinoBackendSelectionGraphic));
+                go.transform.SetParent(transform, false);
+                go.transform.SetAsFirstSibling();
+                var rect = (RectTransform)go.transform;
+                rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one;
+                rect.offsetMin = rect.offsetMax = Vector2.zero;
+                selectionFace = go.GetComponent<KinoBackendSelectionGraphic>();
+                selectionFace.raycastTarget = false;
+            }
+            if (originalFace) originalFace.enabled = !polished;
+            if (originalAccent) originalAccent.gameObject.SetActive(!polished);
+            if (selectionFace)
+            {
+                selectionFace.gameObject.SetActive(polished);
+                if (selectionFace.showArrow != arrow) { selectionFace.showArrow = arrow; selectionFace.SetVerticesDirty(); }
+            }
+            button.transition = polished ? Selectable.Transition.None : Selectable.Transition.ColorTint;
+            button.targetGraphic = polished ? (Graphic)selectionFace : originalFace;
+            label.font = desiredFont;
+            var size = ((RectTransform)transform).sizeDelta;
+            label.rectTransform.sizeDelta = size - new Vector2(polished && arrow ? 64 : 24, 4);
+            label.rectTransform.anchoredPosition = polished && arrow ? new Vector2(-7, 0) : Vector2.zero;
+            RefreshAppearance();
+        }
+
+        void RefreshAppearance()
+        {
+            if (selectionFace) selectionFace.SetState(available, hovered && available, Time.unscaledTime < pressedUntil);
         }
 
         internal void Reveal()
@@ -55,6 +104,8 @@ namespace KinoVR
         void Press(Collider contact)
         {
             if (!CanPress || !panel.TryBeginPress(this, contact)) return;
+            pressedUntil = Time.unscaledTime + .3f;
+            RefreshAppearance();
             // Take a copy: the callback may replace this row, change screens, or hide the panel.
             var callback = selected;
             callback?.Invoke();
@@ -106,15 +157,22 @@ namespace KinoVR
 
         void Update()
         {
+            if (!panel) return;
             if (button) button.interactable = CanPress;
-            if (!CanPress) return;
             var experience = panel.Experience;
             var view = experience && experience.round ? experience.round.playerView : null;
-            if (!view || !view.desktopCamera || !view.desktopCamera.isActiveAndEnabled) return;
+            hovered = false;
+            if (!view || !view.desktopCamera || !view.desktopCamera.isActiveAndEnabled)
+            {
+                RefreshAppearance();
+                return;
+            }
             var mouse = Mouse.current;
-            if (mouse == null || !mouse.leftButton.wasPressedThisFrame) return;
+            if (mouse == null) { RefreshAppearance(); return; }
             var ray = view.desktopCamera.ScreenPointToRay(mouse.position.ReadValue());
-            if (PressArea.Raycast(ray, out _, 4)) Press(null);
+            hovered = PressArea.Raycast(ray, out _, 4);
+            RefreshAppearance();
+            if (CanPress && hovered && mouse.leftButton.wasPressedThisFrame) Press(null);
         }
 
         void OnDestroy()

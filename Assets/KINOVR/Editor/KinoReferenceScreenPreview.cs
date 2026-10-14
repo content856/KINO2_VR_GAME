@@ -117,13 +117,17 @@ namespace KinoVR.Editor
                 var instance = PrefabUtility.GetOutermostPrefabInstanceRoot(round.gameObject);
                 if (instance) PrefabUtility.UnpackPrefabInstance(instance, PrefabUnpackMode.OutermostRoot, InteractionMode.AutomatedAction);
                 var flow = round.experience;
+                flow.useLeaderboard = false;
                 flow.writeLocalRecords = false;
                 Invoke(round.playerView, "Awake");
                 Invoke(flow, "Awake");
+                if (flow.waves) flow.waves.HideImmediately();
                 flow.content.alpha = 0;
                 if (flow.modeCanvas) flow.modeCanvas.gameObject.SetActive(false);
                 flow.enclosure.SetSessionFade(0);
                 flow.enclosure.SetBackground(0);
+                flow.enclosure.SetRoundFade(0);
+                flow.enclosure.SetRoundBackground(0);
 
                 cameraObject = new GameObject("Reference screen capture camera");
                 var camera = cameraObject.AddComponent<Camera>();

@@ -28,6 +28,7 @@ namespace KinoVR
     public sealed class KinoBackendPanel : MonoBehaviour
     {
         const int PageSize = 5;
+        const int PlayerPageSize = 4;
         const string KeyCharacters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         static readonly Color Navy = new Color(.018f, .045f, .10f, .98f);
         static readonly Color Row = new Color(.035f, .105f, .18f, 1);
@@ -39,10 +40,11 @@ namespace KinoVR
         IReadOnlyList<KinoBackendChoice> currentChoices;
         Canvas canvas;
         Image background, topRule, headerDivider;
+        GameObject playerDecoration;
         TMP_Text headingText, statusText, footerText, pageText, codeText;
         KinoBackendTouchButton previous, next, eraseButton, submitButton, retryButton, changePlayerButton;
         int page;
-        bool pairing, readyActions;
+        bool pairing, readyActions, playerSkin, layoutInitialized;
         string currentHeading;
         float readyAt;
         Collider heldContact;
@@ -66,10 +68,19 @@ namespace KinoVR
         }
 
         public void Show(string heading, string status, IReadOnlyList<KinoBackendChoice> choices, string footer = null)
+            => ShowChoices(heading, status, choices, footer, false);
+
+        /// <summary>The branded name picker; setup and pairing retain their existing presentation.</summary>
+        public void ShowPlayerSelection(string heading, string status, IReadOnlyList<KinoBackendChoice> choices, string footer = null)
+            => ShowChoices(heading, status, choices, footer, true);
+
+        void ShowChoices(string heading, string status, IReadOnlyList<KinoBackendChoice> choices, string footer, bool usePlayerSkin)
         {
             RequireInitialized();
-            bool newScreen = !IsVisible || pairing || readyActions || !string.Equals(currentHeading, heading, StringComparison.Ordinal);
+            bool newScreen = !IsVisible || pairing || readyActions || playerSkin != usePlayerSkin || !string.Equals(currentHeading, heading, StringComparison.Ordinal);
             readyActions = false;
+            if (pairing) layoutInitialized = false;
+            ApplyPlayerSkin(usePlayerSkin);
             SetFullPanelVisible(true);
             changePlayerButton.Conceal();
             bool sameChoices = SameChoices(currentChoices, choices);
@@ -79,7 +90,6 @@ namespace KinoVR
             currentHeading = heading;
             headingText.text = heading ?? string.Empty;
             statusText.text = status ?? string.Empty;
-            Place(statusText.rectTransform, new Vector2(0, 173), new Vector2(554, 52));
             footerText.text = footer ?? "Άγγιξε την επιλογή σου με το χέρι.";
             codeText.gameObject.SetActive(false);
             foreach (var key in keys) key.Conceal();
@@ -93,6 +103,7 @@ namespace KinoVR
             RequireInitialized();
             bool newScreen = !IsVisible || !pairing || readyActions;
             readyActions = false;
+            ApplyPlayerSkin(false);
             SetFullPanelVisible(true);
             changePlayerButton.Conceal();
             pairing = true;
@@ -126,6 +137,7 @@ namespace KinoVR
             RequireInitialized();
             bool newScreen = !IsVisible || !readyActions;
             readyActions = true;
+            ApplyPlayerSkin(false);
             pairing = false;
             currentChoices = null;
             currentHeading = null;
@@ -137,18 +149,51 @@ namespace KinoVR
             codeText.gameObject.SetActive(false);
             pageText.gameObject.SetActive(false);
             changePlayerButton.Configure("Αλλαγή παίκτη", changePlayer, changePlayer != null);
+            changePlayerButton.SetAppearance(true, headingFont);
             changePlayerButton.Reveal();
             Present(newScreen);
         }
 
         void SetFullPanelVisible(bool visible)
         {
-            background.gameObject.SetActive(visible);
-            topRule.gameObject.SetActive(visible);
-            headerDivider.gameObject.SetActive(visible);
+            background.gameObject.SetActive(visible && !playerSkin);
+            topRule.gameObject.SetActive(visible && !playerSkin);
+            headerDivider.gameObject.SetActive(visible && !playerSkin);
+            playerDecoration.SetActive(visible && playerSkin);
             headingText.gameObject.SetActive(visible);
             statusText.gameObject.SetActive(visible);
             footerText.gameObject.SetActive(visible);
+        }
+
+        void ApplyPlayerSkin(bool enabled)
+        {
+            if (layoutInitialized && playerSkin == enabled) return;
+            layoutInitialized = true;
+            playerSkin = enabled;
+            ((RectTransform)canvas.transform).sizeDelta = new Vector2(620, enabled ? 620 : 520);
+            Place(headingText.rectTransform, new Vector2(0, enabled ? 70 : 225), new Vector2(554, enabled ? 34 : 44));
+            headingText.fontSize = enabled ? 26 : 29;
+            headingText.color = enabled ? Ivory : Gold;
+            Place(statusText.rectTransform, new Vector2(0, enabled ? 35 : 173), new Vector2(554, enabled ? 30 : 52));
+            statusText.fontSize = enabled ? 19 : 21;
+            statusText.color = enabled ? new Color(.66f, .78f, .92f) : Ivory;
+            Place(footerText.rectTransform, new Vector2(0, enabled ? -285 : -246), new Vector2(570, 25));
+            Place(pageText.rectTransform, new Vector2(0, enabled ? -250 : -207), new Vector2(100, 40));
+            for (int i = 0; i < rows.Count; i++)
+            {
+                PositionButton(rows[i], new Vector2(0, enabled ? -15 - i * 58 : 111 - i * 59), new Vector2(554, enabled ? 49 : 51));
+                rows[i].SetAppearance(enabled, headingFont, enabled);
+            }
+            PositionButton(previous, new Vector2(-185, enabled ? -250 : -207), new Vector2(178, 40));
+            PositionButton(next, new Vector2(185, enabled ? -250 : -207), new Vector2(178, 40));
+            previous.SetAppearance(enabled, headingFont);
+            next.SetAppearance(enabled, headingFont);
+        }
+
+        static void PositionButton(KinoBackendTouchButton button, Vector2 position, Vector2 size)
+        {
+            Place((RectTransform)button.transform, position, size);
+            button.PressArea.size = new Vector3(size.x, size.y, 32);
         }
 
         public void SetStatus(string text)
@@ -186,12 +231,13 @@ namespace KinoVR
         void RenderPage()
         {
             int count = currentChoices?.Count ?? 0;
-            int pages = Mathf.Max(1, (count + PageSize - 1) / PageSize);
+            int pageSize = playerSkin ? PlayerPageSize : PageSize;
+            int pages = Mathf.Max(1, (count + pageSize - 1) / pageSize);
             page = Mathf.Clamp(page, 0, pages - 1);
             for (int i = 0; i < rows.Count; i++)
             {
-                int index = page * PageSize + i;
-                if (index >= count || currentChoices[index] == null) { rows[i].Conceal(); continue; }
+                int index = page * pageSize + i;
+                if (i >= pageSize || index >= count || currentChoices[index] == null) { rows[i].Conceal(); continue; }
                 var choice = currentChoices[index];
                 // Resolve the current list at click time, including callbacks refreshed by polling.
                 rows[i].Configure(choice.Label, () => Select(index), choice.Enabled);
@@ -331,10 +377,40 @@ namespace KinoVR
             retryButton = CreateButton("Retry pairing", new Vector2(0, -215), new Vector2(165, 40), 21);
             submitButton = CreateButton("Submit code", new Vector2(196, -215), new Vector2(165, 40), 21);
             changePlayerButton = CreateButton("Change selected player", Vector2.zero, new Vector2(240, 46), 23);
+            BuildPlayerDecoration();
             foreach (var row in rows) row.Conceal();
             foreach (var key in keys) key.Conceal();
             previous.Conceal(); next.Conceal(); eraseButton.Conceal(); submitButton.Conceal(); retryButton.Conceal();
             changePlayerButton.Conceal();
+        }
+
+        void BuildPlayerDecoration()
+        {
+            playerDecoration = new GameObject("Branded player picker", typeof(RectTransform));
+            playerDecoration.transform.SetParent(canvas.transform, false);
+            playerDecoration.transform.SetAsFirstSibling();
+            Place((RectTransform)playerDecoration.transform, Vector2.zero, new Vector2(620, 620));
+            var face = new GameObject("Navy wave frame", typeof(RectTransform), typeof(KinoBackendSelectionGraphic));
+            face.transform.SetParent(playerDecoration.transform, false);
+            Place((RectTransform)face.transform, Vector2.zero, new Vector2(620, 620));
+            var graphic = face.GetComponent<KinoBackendSelectionGraphic>();
+            graphic.background = true;
+            graphic.raycastTarget = false;
+            var kino = Experience.brandLogo ? Experience.brandLogo.texture : Experience.kinoLogo ? Experience.kinoLogo.texture : null;
+            var vr = Experience.vrExperienceLogo ? Experience.vrExperienceLogo.texture : null;
+            BrandLogo("KINO", kino, new Vector2(0, 232), 172);
+            BrandLogo("VR EXPERIENCE", vr, new Vector2(0, 137), 214);
+            playerDecoration.SetActive(false);
+        }
+
+        void BrandLogo(string name, Texture texture, Vector2 position, float width)
+        {
+            if (!texture) return;
+            var logo = new GameObject(name, typeof(RectTransform), typeof(RawImage)).GetComponent<RawImage>();
+            logo.transform.SetParent(playerDecoration.transform, false);
+            Place(logo.rectTransform, position, new Vector2(width, width * texture.height / texture.width));
+            logo.texture = texture;
+            logo.raycastTarget = false;
         }
 
         KinoBackendTouchButton CreateButton(string name, Vector2 position, Vector2 size, float fontSize)

@@ -241,19 +241,22 @@ namespace KinoVR.Editor
             var number = Label("Second chance number", canvas.transform, font, new Vector2(-338, 57), new Vector2(155, 180), 146);
             number.text = "2";
             KinoScreenTypography.Gold(number, goldText);
-            var ordinal = Label("Second chance ordinal", canvas.transform, font, new Vector2(-264, 97), new Vector2(58, 72), 44);
+            var ordinal = Label("Second chance ordinal", canvas.transform, font, new Vector2(-264, 97), new Vector2(58, 72), 48);
             ordinal.text = "η";
             KinoScreenTypography.Gold(ordinal, goldText);
             var title = Label("Second chance title", canvas.transform, font, new Vector2(111, 57), new Vector2(644, 150), 90);
             title.text = "ΕΥΚΑΙΡΙΑ";
             title.textWrappingMode = TextWrappingModes.NoWrap;
             KinoScreenTypography.Gold(title, goldText);
-            var extra = Label("Extra balls", canvas.transform, font, new Vector2(0, -124), new Vector2(700, 60), 40);
+            var extra = Label("Extra balls", canvas.transform, font, new Vector2(0, -120), new Vector2(780, 68), 52);
             extra.text = "3 ΕΠΙΠΛΕΟΝ ΜΠΑΛΕΣ";
+            extra.fontStyle = FontStyles.Bold;
+            extra.textWrappingMode = TextWrappingModes.NoWrap;
             extra.color = KinoScreenTypography.Ivory;
-            var points = Label("Triple points", canvas.transform, font, new Vector2(0, -181), new Vector2(650, 60), 41);
+            var points = Label("Triple points", canvas.transform, font, new Vector2(0, -184), new Vector2(650, 68), 56);
             points.text = "x3 ΠΟΝΤΟΙ";
             points.fontStyle = FontStyles.Bold;
+            points.textWrappingMode = TextWrappingModes.NoWrap;
             points.color = new Color(.3f, 1, .43f);
             canvas.gameObject.SetActive(false);
         }

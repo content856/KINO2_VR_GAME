@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text;
 using TMPro;
 using UnityEditor;
+using UnityEditor.Build.Profile;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -34,6 +35,23 @@ namespace KinoVR.Editor
             }
         }
 
+        // Compare the two requested UI changes in one offline run. Restore the active
+        // build profile before exiting, without saving any scene or profile asset.
+        public static void CapturePolishBatch()
+        {
+            var profile = BuildProfile.GetActiveBuildProfile();
+            int exitCode = 0;
+            try
+            {
+                BuildProfile.SetActiveBuildProfile(null);
+                Capture();
+                KinoReferenceScreenPreview.Capture();
+            }
+            catch (Exception error) { Debug.LogException(error); exitCode = 1; }
+            finally { BuildProfile.SetActiveBuildProfile(profile); }
+            EditorApplication.Exit(exitCode);
+        }
+
         [MenuItem("Tools/KINO VR/Backend/Capture offline UI previews")]
         public static void Capture()
         {
@@ -45,6 +63,8 @@ namespace KinoVR.Editor
             Directory.CreateDirectory(Output);
             var previousScenes = EditorSceneManager.GetSceneManagerSetup();
             GameObject cameraObject = null;
+            KinoWaveEnvironment previewWaves = null;
+            KinoBlackEnclosure previewEnclosure = null;
             var report = new StringBuilder();
             try
             {
@@ -54,6 +74,8 @@ namespace KinoVR.Editor
                 var instance = PrefabUtility.GetOutermostPrefabInstanceRoot(round.gameObject);
                 if (instance) PrefabUtility.UnpackPrefabInstance(instance, PrefabUnpackMode.OutermostRoot, InteractionMode.AutomatedAction);
                 var experience = round.experience;
+                previewWaves = experience.waves;
+                previewEnclosure = experience.enclosure;
                 // Set before Awake: previews never create a backend coordinator, touch device
                 // credentials, start requests, or write visitor/session records.
                 experience.useLeaderboard = false;
@@ -92,21 +114,21 @@ namespace KinoVR.Editor
                     new KinoBackendChoice("Κωνσταντίνος-Αλέξανδρος", NoAction),
                     new KinoBackendChoice("Χριστόφορος_Παπαδόπουλος", NoAction),
                     new KinoBackendChoice("Μαρία_Θεσσαλονίκη", NoAction),
-                    new KinoBackendChoice("<b>Νίκος</b>", NoAction),
+                    new KinoBackendChoice("Νίκος_Πειραιάς", NoAction),
                     new KinoBackendChoice("Αναστασία_Παπαδοπούλου", NoAction),
                     new KinoBackendChoice("Δημήτρης_Περιστέρι", NoAction),
                     new KinoBackendChoice("Γιώργος_Αθήνα", NoAction)
                 };
-                panel.Show("ΕΠΙΛΕΞΕ ΤΟ ΟΝΟΜΑ ΣΟΥ", "7 διαθέσιμοι παίκτες · Allwyn", players);
+                panel.ShowPlayerSelection("ΕΠΙΛΕΞΕ ΤΟ ΟΝΟΜΑ ΣΟΥ", "7 διαθέσιμοι παίκτες · Allwyn", players);
                 CapturePair(camera, panel, "02-players-page-1", playerFov, report);
                 ValidateDenseTouchTargets(panel, report);
                 Invoke(panel, "ChangePage", 1);
                 CapturePair(camera, panel, "03-players-page-2", playerFov, report);
-                panel.Show("ΕΠΙΛΕΞΕ ΤΟ ΟΝΟΜΑ ΣΟΥ", "Η λίστα ανανεώθηκε · Allwyn", new List<KinoBackendChoice>(players));
+                panel.ShowPlayerSelection("ΕΠΙΛΕΞΕ ΤΟ ΟΝΟΜΑ ΣΟΥ", "Η λίστα ανανεώθηκε · Allwyn", new List<KinoBackendChoice>(players));
                 Require((int)typeof(KinoBackendPanel).GetField("page", PrivateInstance).GetValue(panel) == 1,
                     "An unchanged polled list reset the page.");
 
-                panel.Show("ΕΠΙΛΕΞΕ ΤΟ ΟΝΟΜΑ ΣΟΥ", "Αναμονή εγγραφής από το tablet.", new List<KinoBackendChoice>(),
+                panel.ShowPlayerSelection("ΕΠΙΛΕΞΕ ΤΟ ΟΝΟΜΑ ΣΟΥ", "Αναμονή εγγραφής από το tablet.", new List<KinoBackendChoice>(),
                     "Το όνομά σου θα εμφανιστεί μόλις ολοκληρωθεί η εγγραφή.");
                 CapturePair(camera, panel, "04-waiting-for-tablet", playerFov, report);
 
@@ -131,6 +153,16 @@ namespace KinoVR.Editor
             }
             finally
             {
+                // Awake is invoked manually in edit mode; turn off the generated,
+                // non-saved renderers before another capture opens its fixture.
+                if (previewWaves) previewWaves.HideImmediately();
+                if (previewEnclosure)
+                {
+                    previewEnclosure.SetBackground(0);
+                    previewEnclosure.SetRoundBackground(0);
+                    previewEnclosure.SetSessionFade(0);
+                    previewEnclosure.SetRoundFade(0);
+                }
                 if (cameraObject) Object.DestroyImmediate(cameraObject);
                 EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
                 if (previousScenes.Length > 0) EditorSceneManager.RestoreSceneManagerSetup(previousScenes);
@@ -165,8 +197,10 @@ namespace KinoVR.Editor
             var canvas = PanelCanvas(panel);
             var labels = canvas.GetComponentsInChildren<TMP_Text>();
             Require(labels.Length == 1 && labels[0].text == "Αλλαγή παίκτη", "Ready left full-panel text visible.");
-            Require(canvas.GetComponentsInChildren<Image>().Length == 2, "Ready left an opaque full panel visible.");
             Require(canvas.GetComponentsInChildren<KinoBackendTouchButton>().Length == 1, "Ready left additional backend controls active.");
+            var correction = canvas.GetComponentInChildren<KinoBackendTouchButton>();
+            foreach (var graphic in canvas.GetComponentsInChildren<Graphic>())
+                Require(graphic.transform.IsChildOf(correction.transform), "Ready left graphics outside its correction button visible.");
             var delta = canvas.transform.position - experience.modeCanvas.transform.position;
             var desktop = experience.round.playerView.desktopCamera;
             if (desktop && desktop.isActiveAndEnabled)
