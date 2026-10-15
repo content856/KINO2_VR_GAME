@@ -17,6 +17,11 @@ nickname; Ready shows that nickname and offers **Αλλαγή παίκτη**. Re
 an unfinished visitor but retains the selected store. Store settings are accessible from the player
 picker. Turning off the leaderboard connection in Experience Sequence enables local rehearsal.
 
+Campaign, region, store and player selection share the blue KINO / VR EXPERIENCE panel used by
+**ΕΠΙΛΕΞΕ ΤΟ ΟΝΟΜΑ ΣΟΥ**, including store settings and the return after changing player. Menu
+buttons respond to the tracked index fingertip on either hand; the wrist/palm colliders remain
+dedicated to catching balls. Tracking loss disables fingertip presses until tracking returns.
+
 Final results are journaled before upload, with one stable submission ID. A new game cannot start
 until the previous result is accepted or a definite rejection is acknowledged. Network/429/5xx
 errors retry with backoff and Retry-After, including while the headset is removed (while the app is

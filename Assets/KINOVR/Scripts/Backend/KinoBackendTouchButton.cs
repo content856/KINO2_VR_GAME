@@ -25,6 +25,8 @@ namespace KinoVR
         readonly HashSet<Collider> releaseBeforePress = new HashSet<Collider>();
         internal BoxCollider PressArea { get; private set; }
 
+        void OnEnable() => releaseBeforePress.Clear();
+
         internal void Initialize(KinoBackendPanel owner, Button target, TMP_Text caption, BoxCollider area)
         {
             panel = owner;
@@ -128,11 +130,9 @@ namespace KinoVR
 
         void Touch(Collider other)
         {
-            var hand = other.GetComponentInParent<HandCatcher>();
-            if (!hand || !hand.isActiveAndEnabled) return;
+            if (!KinoFingerTip.IsFinger(other)) return;
             if (!IsTouching(PressArea, other)) { releaseBeforePress.Remove(other); return; }
-            // Existing catch spheres have a 10 cm radius. Test the palm centre against
-            // this row so their broad overlap cannot select a neighbouring row or key.
+            // Only the index tip may select a row; the broad ball-catch sphere is ignored.
             if (releaseBeforePress.Contains(other)) return;
             if (CanPress) Press(other);
             // Also require a fresh touch if a hand was already inside while loading,
@@ -141,19 +141,7 @@ namespace KinoVR
         }
 
         internal static bool IsTouching(BoxCollider area, Collider contact, float extraMetres = 0)
-        {
-            if (!area || !contact) return false;
-            var sphere = contact as SphereCollider;
-            var center = sphere ? sphere.transform.TransformPoint(sphere.center) : contact.bounds.center;
-            var local = area.transform.InverseTransformPoint(center) - area.center;
-            var scale = area.transform.lossyScale;
-            float paddingX = extraMetres / Mathf.Max(.00001f, Mathf.Abs(scale.x));
-            float paddingY = extraMetres / Mathf.Max(.00001f, Mathf.Abs(scale.y));
-            float paddingZ = (.025f + extraMetres) / Mathf.Max(.00001f, Mathf.Abs(scale.z));
-            return Mathf.Abs(local.x) <= area.size.x * .5f + paddingX &&
-                Mathf.Abs(local.y) <= area.size.y * .5f + paddingY &&
-                Mathf.Abs(local.z) <= area.size.z * .5f + paddingZ;
-        }
+            => KinoFingerTip.IsTouching(area, contact, extraMetres);
 
         void Update()
         {

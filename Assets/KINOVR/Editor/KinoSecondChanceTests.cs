@@ -352,11 +352,8 @@ namespace KinoVR.Editor
                     restartReadyAt = Time.realtimeSinceStartupAsDouble + .45;
                     if (run == 0)
                     {
-                        hand = new GameObject("Physical restart hand");
+                        hand = KinoFingerTouchTests.CreateFinger("Physical restart index fingertip");
                         hand.transform.position = round.restartButton.transform.position + Vector3.up;
-                        hand.AddComponent<HandCatcher>();
-                        var collider = hand.AddComponent<SphereCollider>();
-                        collider.isTrigger = true; collider.radius = .06f;
                     }
                     return;
                 }

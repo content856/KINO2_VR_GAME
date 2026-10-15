@@ -8,6 +8,59 @@ namespace KinoVR.Editor
 {
     public static partial class KinoGameplaySetup
     {
+        [MenuItem("Tools/KINO VR/Second Chance/Capture active board header")]
+        public static void CaptureSecondChanceHeader()
+        {
+            RequireScene();
+            Directory.CreateDirectory(SecondChanceOutput);
+            var round = Object.FindFirstObjectByType<KinoRoundController>();
+            var original = round.board;
+            bool wasActive = original.gameObject.activeSelf;
+            var board = Object.Instantiate(original, original.transform.parent);
+            var go = new GameObject("Second Chance header preview camera");
+            var camera = go.AddComponent<Camera>();
+            camera.enabled = false;
+            camera.stereoTargetEye = StereoTargetEyeMask.None;
+            original.gameObject.SetActive(false);
+            try
+            {
+                board.gameObject.SetActive(true);
+                board.ResetBoard();
+                board.SetSecondChanceCover(false);
+                foreach (int n in new[] { 7, 12, 26, 34, 57, 71, 80 }) board.MarkCaught(n);
+                foreach (int n in new[] { 26, 48, 80 }) board.MarkCaught(n, false, true);
+                board.SetProgress(19, 0, 60, false);
+                board.statusText.text = "SECOND CHANCE <color=#36EB69>x3</color>";
+                board.caughtTotalText.text = "EXTRA 3 / 3";
+                board.transform.Find("BOOST display/Sharp KINO brand").gameObject.SetActive(false);
+                board.transform.Find("BOOST display/BOOST active header").gameObject.SetActive(false);
+                board.transform.Find("Second Chance display/Second Chance active header").gameObject.SetActive(true);
+                foreach (var label in board.GetComponentsInChildren<TMP_Text>(true)) label.ForceMeshUpdate(true, true);
+                var screen = Screen().bounds;
+                camera.orthographic = true;
+                camera.orthographicSize = screen.size.y * .505f;
+                camera.transform.SetPositionAndRotation(screen.center + Vector3.back * 2, Quaternion.identity);
+                camera.nearClipPlane = .02f;
+                camera.farClipPlane = 80;
+                Capture(camera, SecondChanceOutput + "/SecondChance-header-board.png", 1600, 904);
+                var view = round.playerView.View ? round.playerView.View : round.playerView.desktopCamera ?
+                    round.playerView.desktopCamera.transform : round.playerView.head;
+                var source = view.GetComponent<Camera>();
+                if (source) camera.CopyFrom(source);
+                camera.enabled = false;
+                camera.stereoTargetEye = StereoTargetEyeMask.None;
+                camera.transform.SetPositionAndRotation(view.position, view.rotation);
+                Capture(camera, SecondChanceOutput + "/SecondChance-header-player.png", 1600, 1000);
+            }
+            finally
+            {
+                Object.DestroyImmediate(board.gameObject);
+                Object.DestroyImmediate(go);
+                original.gameObject.SetActive(wasActive);
+            }
+            Status("SECOND_CHANCE_HEADER_PREVIEWS_READY");
+        }
+
         internal static void CaptureSequencePlayerView(KinoRoundController round, string name)
         {
             var go = new GameObject("Sequence player QA camera");

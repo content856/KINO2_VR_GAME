@@ -13,24 +13,29 @@ namespace KinoVR.Editor
         internal const string SecondChanceOutput = "Artifacts/KinoGameplay/SecondChance";
         const string SecondChanceLogo = "Assets/KINOVR/Textures/SecondChanceLogo.png";
 
+        [MenuItem("Tools/KINO VR/Second Chance/Sharpen active board header")]
+        public static void ApplySecondChanceHeader()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode) throw new InvalidOperationException("Exit Play first.");
+            ConfigureSecondChanceLogoImport();
+            var gameplay = PrefabUtility.LoadPrefabContents(GameplayPrefab);
+            try
+            {
+                ConfigureSecondChanceHeader(gameplay.GetComponent<KinoRoundController>().secondChancePresentation);
+                PrefabUtility.SaveAsPrefabAsset(gameplay, GameplayPrefab);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(gameplay); }
+            AssetDatabase.SaveAssets();
+            Status("SECOND_CHANCE_HEADER_READY");
+        }
+
         [MenuItem("Tools/KINO VR/Second Chance/1 - Set up sequence and client showcase")]
         public static void ApplySecondChance()
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) throw new InvalidOperationException("Exit Play first.");
             LoadMaterials();
             Directory.CreateDirectory(SecondChanceOutput);
-            var importer = (TextureImporter)AssetImporter.GetAtPath(SecondChanceLogo);
-            if (!importer) throw new InvalidOperationException("Render SecondChanceLogo.png from the supplied PDF first.");
-            importer.alphaIsTransparency = true;
-            importer.mipmapEnabled = true;
-            importer.filterMode = FilterMode.Trilinear;
-            importer.anisoLevel = 8;
-            importer.maxTextureSize = 4096;
-            importer.textureCompression = TextureImporterCompression.Uncompressed;
-            var android = importer.GetPlatformTextureSettings("Android");
-            android.overridden = true; android.maxTextureSize = 4096; android.format = TextureImporterFormat.ASTC_4x4;
-            importer.SetPlatformTextureSettings(android);
-            importer.SaveAndReimport();
+            ConfigureSecondChanceLogoImport();
 
             const string ballPath = "Assets/KINOVR/Prefabs/NumberedBall.prefab";
             var ball = PrefabUtility.LoadPrefabContents(ballPath);
@@ -51,6 +56,43 @@ namespace KinoVR.Editor
             AssetDatabase.SaveAssets();
             KinoSecondChanceTests.ValidateRulesAndAssets();
             Status("SECOND_CHANCE_READY");
+        }
+
+        static void ConfigureSecondChanceLogoImport()
+        {
+            var importer = (TextureImporter)AssetImporter.GetAtPath(SecondChanceLogo);
+            if (!importer) throw new InvalidOperationException("Render SecondChanceLogo.png from the supplied PDF first.");
+            importer.alphaIsTransparency = true;
+            importer.mipmapEnabled = true;
+            // Keep the supplied artwork's aspect and crisp lettering at headset distances.
+            importer.npotScale = TextureImporterNPOTScale.None;
+            importer.mipmapFilter = TextureImporterMipFilter.KaiserFilter;
+            importer.filterMode = FilterMode.Trilinear;
+            importer.mipMapBias = -.35f;
+            importer.anisoLevel = 8;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.maxTextureSize = 4096;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            var android = importer.GetPlatformTextureSettings("Android");
+            android.overridden = true; android.maxTextureSize = 4096; android.format = TextureImporterFormat.ASTC_4x4;
+            importer.SetPlatformTextureSettings(android);
+            importer.SaveAndReimport();
+        }
+
+        static void ConfigureSecondChanceHeader(KinoSecondChancePresentation presentation)
+        {
+            if (!presentation || !presentation.activeHeader)
+                throw new InvalidOperationException("Set up the Second Chance sequence first.");
+            var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(SecondChanceLogo);
+            var logoTransform = presentation.activeHeader.transform.Find("Second Chance header logo");
+            if (!logoTransform) throw new InvalidOperationException("The Second Chance header logo is missing.");
+            var logo = logoTransform.GetComponent<RawImage>();
+            logo.texture = texture;
+            logo.color = Color.white;
+            logo.raycastTarget = false;
+            // Enlarge within the central bay: clear of the score/catches and the time bar.
+            const float width = 380;
+            Place(logo.rectTransform, 350, 1.5f, width, width * texture.height / texture.width);
         }
 
         static void ConfigureSecondChanceBall(GameObject ball)
@@ -106,6 +148,7 @@ namespace KinoVR.Editor
             if (round.secondChancePresentation)
             {
                 foreach (var label in board.multiplierLabels) if (label) label.fontSharedMaterial = popupMaterial;
+                ConfigureSecondChanceHeader(round.secondChancePresentation);
                 KinoExperienceSetup.ConfigureSecondChanceScreen(round.secondChancePresentation);
                 return;
             }
@@ -126,6 +169,7 @@ namespace KinoVR.Editor
             var header = FullBoardGroup("Second Chance active header", root);
             LogoImage("Second Chance header logo", header, texture, 370, 9, 326);
             presentation.activeHeader = header.gameObject;
+            ConfigureSecondChanceHeader(presentation);
             // Separate overlay labels restart on every repeat catch without replacing the number.
             var effects = FullBoardGroup("Boost per-number multipliers", board.transform);
             board.multiplierLabels = new TMP_Text[80];

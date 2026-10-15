@@ -1,10 +1,11 @@
 using UnityEngine;
+using System.Collections.Generic;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace KinoVR
 {
-    // A stationary, reachable world-space button using the same hands as ball catching.
+    // A stationary, reachable world-space button touched with the tracked index tip.
     public sealed class KinoRestartButton : MonoBehaviour
     {
         public KinoRoundController round;
@@ -17,8 +18,10 @@ namespace KinoVR
             round.State.Phase == KinoRoundPhase.Complete && !round.IsRunning &&
             Time.unscaledTime >= readyAt;
         float readyAt;
+        readonly HashSet<Collider> releaseBeforePress = new HashSet<Collider>();
 
         void Awake() => button.onClick.AddListener(Press);
+        void OnEnable() => releaseBeforePress.Clear();
         void OnDestroy() { if (button) button.onClick.RemoveListener(Press); }
 
         public void Show()
@@ -54,9 +57,14 @@ namespace KinoVR
 
         void OnTriggerEnter(Collider other)
         {
-            var hand = other.GetComponentInParent<HandCatcher>();
-            if (CanPress && hand && hand.isActiveAndEnabled) button.onClick.Invoke();
+            if (!KinoFingerTip.IsFinger(other)) return;
+            if (!KinoFingerTip.IsTouching(pressArea, other)) { releaseBeforePress.Remove(other); return; }
+            if (releaseBeforePress.Contains(other)) return;
+            if (CanPress) button.onClick.Invoke();
+            releaseBeforePress.Add(other);
         }
+        void OnTriggerStay(Collider other) => OnTriggerEnter(other);
+        void OnTriggerExit(Collider other) => releaseBeforePress.Remove(other);
 
         void Update()
         {

@@ -68,11 +68,11 @@ namespace KinoVR
         }
 
         public void Show(string heading, string status, IReadOnlyList<KinoBackendChoice> choices, string footer = null)
-            => ShowChoices(heading, status, choices, footer, false);
-
-        /// <summary>The branded name picker; setup and pairing retain their existing presentation.</summary>
-        public void ShowPlayerSelection(string heading, string status, IReadOnlyList<KinoBackendChoice> choices, string footer = null)
             => ShowChoices(heading, status, choices, footer, true);
+
+        /// <summary>All selection screens share the branded name-picker presentation.</summary>
+        public void ShowPlayerSelection(string heading, string status, IReadOnlyList<KinoBackendChoice> choices, string footer = null)
+            => Show(heading, status, choices, footer);
 
         void ShowChoices(string heading, string status, IReadOnlyList<KinoBackendChoice> choices, string footer, bool usePlayerSkin)
         {
@@ -90,7 +90,7 @@ namespace KinoVR
             currentHeading = heading;
             headingText.text = heading ?? string.Empty;
             statusText.text = status ?? string.Empty;
-            footerText.text = footer ?? "Άγγιξε την επιλογή σου με το χέρι.";
+            footerText.text = footer ?? "Άγγιξε την επιλογή σου με τον δείκτη.";
             codeText.gameObject.SetActive(false);
             foreach (var key in keys) key.Conceal();
             eraseButton.Conceal(); submitButton.Conceal(); retryButton.Conceal();
@@ -174,7 +174,7 @@ namespace KinoVR
             Place(headingText.rectTransform, new Vector2(0, enabled ? 70 : 225), new Vector2(554, enabled ? 34 : 44));
             headingText.fontSize = enabled ? 26 : 29;
             headingText.color = enabled ? Ivory : Gold;
-            Place(statusText.rectTransform, new Vector2(0, enabled ? 35 : 173), new Vector2(554, enabled ? 30 : 52));
+            Place(statusText.rectTransform, new Vector2(0, enabled ? 33 : 173), new Vector2(554, enabled ? 40 : 52));
             statusText.fontSize = enabled ? 19 : 21;
             statusText.color = enabled ? new Color(.66f, .78f, .92f) : Ivory;
             Place(footerText.rectTransform, new Vector2(0, enabled ? -285 : -246), new Vector2(570, 25));

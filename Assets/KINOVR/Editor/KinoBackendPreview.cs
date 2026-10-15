@@ -35,6 +35,42 @@ namespace KinoVR.Editor
             }
         }
 
+        public static void CaptureSelectionAndHeaderBatch()
+            => CaptureSelectionAndHeaderBatch(false);
+
+        public static void CaptureSelectionHeaderAndTestBatch()
+            => CaptureSelectionAndHeaderBatch(true);
+
+        static void CaptureSelectionAndHeaderBatch(bool play)
+        {
+            var profile = BuildProfile.GetActiveBuildProfile();
+            var scenes = EditorSceneManager.GetSceneManagerSetup();
+            int exitCode = 0;
+            try
+            {
+                BuildProfile.SetActiveBuildProfile(null);
+                KinoFingerTouchTests.Validate();
+                KinoGameplaySetup.ApplySecondChanceHeader();
+                Capture();
+                EditorSceneManager.OpenScene(ScenePath);
+                KinoGameplaySetup.CaptureSecondChanceHeader();
+            }
+            catch (Exception error)
+            {
+                Directory.CreateDirectory(Output);
+                File.WriteAllText(Output + "/validation.txt", "FAIL\n" + error);
+                Debug.LogException(error);
+                exitCode = 1;
+            }
+            finally
+            {
+                if (scenes.Length > 0) EditorSceneManager.RestoreSceneManagerSetup(scenes);
+                BuildProfile.SetActiveBuildProfile(profile);
+            }
+            if (exitCode == 0 && play) KinoBackendTests.RunOfflineExperienceBatch();
+            else EditorApplication.Exit(exitCode);
+        }
+
         // Compare the two requested UI changes in one offline run. Restore the active
         // build profile before exiting, without saving any scene or profile asset.
         public static void CapturePolishBatch()
@@ -109,6 +145,42 @@ namespace KinoVR.Editor
                 panel.ShowPairing("DEMO7A2B", "Πληκτρολόγησε τον κωδικό από το admin.", _ => { }, NoAction, NoAction, NoAction);
                 CapturePair(camera, panel, "01-pairing", playerFov, report);
 
+                panel.Show("ΕΠΙΛΟΓΗ ΚΑΜΠΑΝΙΑΣ", "Επίλεξε την καμπάνια της εκδήλωσης.", new[]
+                {
+                    new KinoBackendChoice("KINO VR Experience", NoAction),
+                    new KinoBackendChoice("Allwyn", NoAction)
+                });
+                CapturePair(camera, panel, "06-campaigns", playerFov, report);
+                panel.Show("ΕΠΙΛΟΓΗ ΠΕΡΙΟΧΗΣ", "Σε ποια περιοχή βρίσκεσαι;", new[]
+                {
+                    new KinoBackendChoice("Αττική", NoAction),
+                    new KinoBackendChoice("Κεντρική Μακεδονία", NoAction),
+                    new KinoBackendChoice("Πίσω στις καμπάνιες", NoAction)
+                });
+                CapturePair(camera, panel, "07-regions", playerFov, report);
+                panel.Show("ΕΠΙΛΟΓΗ ΚΑΤΑΣΤΗΜΑΤΟΣ", "Επίλεξε το κατάστημα της μάσκας.", new[]
+                {
+                    new KinoBackendChoice("Αθήνα · ATH01", NoAction),
+                    new KinoBackendChoice("Πειραιάς · PIR02", NoAction),
+                    new KinoBackendChoice("Περιστέρι · PER03 — χωρίς event", NoAction),
+                    new KinoBackendChoice("Μαρούσι · MAR04", NoAction),
+                    new KinoBackendChoice("Πίσω στις περιοχές", NoAction)
+                }, "Allwyn");
+                CapturePair(camera, panel, "08-stores-page-1", playerFov, report);
+                Invoke(panel, "ChangePage", 1);
+                CapturePair(camera, panel, "09-stores-page-2", playerFov, report);
+                panel.Show("ΑΛΛΑΓΗ ΚΑΤΑΣΤΗΜΑΤΟΣ", "Για το προσωπικό της εκδήλωσης.", new[]
+                {
+                    new KinoBackendChoice("Αλλαγή καταστήματος", NoAction),
+                    new KinoBackendChoice("Επιστροφή στους παίκτες", NoAction)
+                }, "Αθήνα");
+                CapturePair(camera, panel, "10-change-store", playerFov, report);
+                panel.Show("ΤΟ ΣΚΟΡ ΔΕΝ ΚΑΤΑΧΩΡΙΣΤΗΚΕ", "Ενημέρωσε το προσωπικό. Το αποτέλεσμα κρατήθηκε στη μάσκα.", new[]
+                {
+                    new KinoBackendChoice("Εντάξει — επόμενος παίκτης", NoAction)
+                });
+                CapturePair(camera, panel, "11-status-message", playerFov, report);
+
                 var players = new List<KinoBackendChoice>
                 {
                     new KinoBackendChoice("Κωνσταντίνος-Αλέξανδρος", NoAction),
@@ -174,22 +246,26 @@ namespace KinoVR.Editor
             var canvas = PanelCanvas(panel);
             var first = canvas.transform.Find("Choice 1").GetComponent<BoxCollider>();
             var second = canvas.transform.Find("Choice 2").GetComponent<BoxCollider>();
-            var fixture = new GameObject("Synthetic 10 cm palm collider");
+            var fixture = KinoFingerTouchTests.CreateFinger("Synthetic index fingertip");
+            var wrist = new GameObject("Synthetic 10 cm wrist collider");
             try
             {
-                var sphere = fixture.AddComponent<SphereCollider>();
-                sphere.radius = .1f;
-                sphere.isTrigger = true;
+                var sphere = fixture.GetComponent<SphereCollider>();
+                var wristSphere = wrist.AddComponent<SphereCollider>();
+                wristSphere.radius = .1f;
+                wristSphere.isTrigger = true;
                 var touch = typeof(KinoBackendTouchButton).GetMethod("IsTouching", BindingFlags.Static | BindingFlags.NonPublic);
                 fixture.transform.position = first.transform.position;
-                Require((bool)touch.Invoke(null, new object[] { first, sphere, 0f }), "Palm center did not hit its own row.");
-                Require(!(bool)touch.Invoke(null, new object[] { second, sphere, 0f }), "The 10 cm hand sphere hit a neighboring row.");
+                wrist.transform.position = first.transform.position;
+                Require(!(bool)touch.Invoke(null, new object[] { first, wristSphere, 0f }), "The wrist can still select a row.");
+                Require((bool)touch.Invoke(null, new object[] { first, sphere, 0f }), "The index fingertip did not hit its own row.");
+                Require(!(bool)touch.Invoke(null, new object[] { second, sphere, 0f }), "The fingertip hit a neighboring row.");
                 first.gameObject.SetActive(false);
                 Require((bool)touch.Invoke(null, new object[] { first, sphere, .012f }), "Hiding a row discarded the held-contact latch volume.");
                 first.gameObject.SetActive(true);
             }
-            finally { Object.DestroyImmediate(fixture); }
-            report.AppendLine("PASS: dense rows use palm center, reject neighboring 10 cm sphere overlap, and retain hidden-row latch geometry.");
+            finally { Object.DestroyImmediate(fixture); Object.DestroyImmediate(wrist); }
+            report.AppendLine("PASS: dense rows accept only the index fingertip, reject wrist and neighboring-row overlap, and retain hidden-row latch geometry.");
         }
 
         static void ValidateReadyAction(KinoBackendPanel panel, KinoExperienceController experience, StringBuilder report)
@@ -295,6 +371,11 @@ namespace KinoVR.Editor
             try
             {
                 camera.targetTexture = target;
+                // The second shot changes projection and target size without an Editor
+                // frame between renders. Rebuild graphics so logo batches are current.
+                foreach (var graphic in Object.FindObjectsByType<Graphic>(FindObjectsSortMode.None))
+                    graphic.SetAllDirty();
+                Canvas.ForceUpdateCanvases();
                 RenderPipeline.SubmitRenderRequest(camera, new RenderPipeline.StandardRequest { destination = target });
                 RenderTexture.active = target;
                 pixels.ReadPixels(new Rect(0, 0, width, height), 0, 0);

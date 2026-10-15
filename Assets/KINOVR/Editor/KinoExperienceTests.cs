@@ -527,11 +527,8 @@ namespace KinoVR.Editor
             if (run == 0) { choice.button.onClick.Invoke(); inputSent = true; return; }
             if (!hand)
             {
-                hand = new GameObject("Experience mode physical hand");
+                hand = KinoFingerTouchTests.CreateFinger("Experience mode physical index fingertip");
                 hand.transform.position = choice.pressArea.bounds.center + Vector3.up;
-                hand.AddComponent<HandCatcher>();
-                var collider = hand.AddComponent<SphereCollider>(); collider.isTrigger = true; collider.radius = .04f;
-                var body = hand.AddComponent<Rigidbody>(); body.isKinematic = true; body.useGravity = false;
                 Physics.SyncTransforms(); handCreatedAt = Time.fixedTime; return;
             }
             if (!handMoved && Time.fixedTime > handCreatedAt)

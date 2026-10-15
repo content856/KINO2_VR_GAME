@@ -19,7 +19,7 @@ namespace KinoVR
         public Color hotFill = new Color(.05f, .42f, 1f, .92f);
         public Color edge = new Color(.4f, .78f, 1f, 1f);
 
-        HandCatcher[] hands;
+        KinoFingerTip[] hands;
         float nextHandSearch, proximity, armed;
         Vector3 lastPosition;
 
@@ -32,7 +32,7 @@ namespace KinoVR
 
         void FindHands()
         {
-            hands = FindObjectsByType<HandCatcher>(FindObjectsSortMode.None);
+            hands = FindObjectsByType<KinoFingerTip>(FindObjectsSortMode.None);
             nextHandSearch = Time.unscaledTime + 2;
         }
 
@@ -49,7 +49,8 @@ namespace KinoVR
             lastPosition = centre;
             if (hands != null)
                 foreach (var hand in hands)
-                    if (hand && hand.isActiveAndEnabled) nearest = Mathf.Min(nearest, Vector3.Distance(hand.transform.position, centre));
+                    if (hand && KinoFingerTip.IsFinger(hand.GetComponent<SphereCollider>()))
+                        nearest = Mathf.Min(nearest, Vector3.Distance(hand.transform.position, centre));
             float target = canPress ? Mathf.Clamp01(1 - (nearest - .04f) / Mathf.Max(.01f, approachDistance)) : 0;
             proximity = Mathf.MoveTowards(proximity, target, dt / .15f);
 

@@ -11,6 +11,12 @@ public class HandCatcher : MonoBehaviour
     [Tooltip("Only objects with this tag are treated as catchable balls.")]
     public string ballTag = "Ball";
 
+    void Awake()
+    {
+        if (GetComponentInParent<OVRHand>(true) && !GetComponent<KinoVR.KinoIndexFingerTouch>())
+            gameObject.AddComponent<KinoVR.KinoIndexFingerTouch>();
+    }
+
     void OnTriggerEnter(Collider other)
     {
         if (!other.CompareTag(ballTag)) return;
