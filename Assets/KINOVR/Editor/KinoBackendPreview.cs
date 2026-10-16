@@ -189,7 +189,9 @@ namespace KinoVR.Editor
                     new KinoBackendChoice("Νίκος_Πειραιάς", NoAction),
                     new KinoBackendChoice("Αναστασία_Παπαδοπούλου", NoAction),
                     new KinoBackendChoice("Δημήτρης_Περιστέρι", NoAction),
-                    new KinoBackendChoice("Γιώργος_Αθήνα", NoAction)
+                    new KinoBackendChoice("Γιώργος_Αθήνα", NoAction),
+                    new KinoBackendChoice("Ανανέωση λίστας", NoAction, isUtility: true),
+                    new KinoBackendChoice("Ρυθμίσεις καταστήματος", NoAction, isUtility: true)
                 };
                 panel.ShowPlayerSelection("ΕΠΙΛΕΞΕ ΤΟ ΟΝΟΜΑ ΣΟΥ", "7 διαθέσιμοι παίκτες · Allwyn", players);
                 CapturePair(camera, panel, "02-players-page-1", playerFov, report);
@@ -199,8 +201,14 @@ namespace KinoVR.Editor
                 panel.ShowPlayerSelection("ΕΠΙΛΕΞΕ ΤΟ ΟΝΟΜΑ ΣΟΥ", "Η λίστα ανανεώθηκε · Allwyn", new List<KinoBackendChoice>(players));
                 Require((int)typeof(KinoBackendPanel).GetField("page", PrivateInstance).GetValue(panel) == 1,
                     "An unchanged polled list reset the page.");
+                Invoke(panel, "ChangePage", 1);
+                CapturePair(camera, panel, "12-player-and-store-actions", playerFov, report);
 
-                panel.ShowPlayerSelection("ΕΠΙΛΕΞΕ ΤΟ ΟΝΟΜΑ ΣΟΥ", "Αναμονή εγγραφής από το tablet.", new List<KinoBackendChoice>(),
+                panel.ShowPlayerSelection("ΕΠΙΛΕΞΕ ΤΟ ΟΝΟΜΑ ΣΟΥ", "Αναμονή εγγραφής από το tablet.", new[]
+                {
+                    new KinoBackendChoice("Ανανέωση λίστας", NoAction, isUtility: true),
+                    new KinoBackendChoice("Ρυθμίσεις καταστήματος", NoAction, isUtility: true)
+                },
                     "Το όνομά σου θα εμφανιστεί μόλις ολοκληρωθεί η εγγραφή.");
                 CapturePair(camera, panel, "04-waiting-for-tablet", playerFov, report);
 

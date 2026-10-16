@@ -11,12 +11,14 @@ namespace KinoVR
         public string Label;
         public Action Selected;
         public bool Enabled = true;
+        public bool IsUtility;
 
-        public KinoBackendChoice(string label, Action selected, bool enabled = true)
+        public KinoBackendChoice(string label, Action selected, bool enabled = true, bool isUtility = false)
         {
             Label = label;
             Selected = selected;
             Enabled = enabled;
+            IsUtility = isUtility;
         }
     }
 
@@ -28,7 +30,8 @@ namespace KinoVR
     public sealed class KinoBackendPanel : MonoBehaviour
     {
         const int PageSize = 5;
-        const int PlayerPageSize = 4;
+        const int BrandedPageSize = 4;
+        const int PlayerPageSize = 3;
         const string KeyCharacters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         static readonly Color Navy = new Color(.018f, .045f, .10f, .98f);
         static readonly Color Row = new Color(.035f, .105f, .18f, 1);
@@ -44,7 +47,7 @@ namespace KinoVR
         TMP_Text headingText, statusText, footerText, pageText, codeText;
         KinoBackendTouchButton previous, next, eraseButton, submitButton, retryButton, changePlayerButton;
         int page;
-        bool pairing, readyActions, playerSkin, layoutInitialized;
+        bool pairing, readyActions, playerSkin, layoutInitialized, nameSelection;
         string currentHeading;
         float readyAt;
         Collider heldContact;
@@ -72,13 +75,14 @@ namespace KinoVR
 
         /// <summary>All selection screens share the branded name-picker presentation.</summary>
         public void ShowPlayerSelection(string heading, string status, IReadOnlyList<KinoBackendChoice> choices, string footer = null)
-            => Show(heading, status, choices, footer);
+            => ShowChoices(heading, status, choices, footer, true, true);
 
-        void ShowChoices(string heading, string status, IReadOnlyList<KinoBackendChoice> choices, string footer, bool usePlayerSkin)
+        void ShowChoices(string heading, string status, IReadOnlyList<KinoBackendChoice> choices, string footer, bool usePlayerSkin, bool spacePlayerChoices = false)
         {
             RequireInitialized();
-            bool newScreen = !IsVisible || pairing || readyActions || playerSkin != usePlayerSkin || !string.Equals(currentHeading, heading, StringComparison.Ordinal);
+            bool newScreen = !IsVisible || pairing || readyActions || playerSkin != usePlayerSkin || nameSelection != spacePlayerChoices || !string.Equals(currentHeading, heading, StringComparison.Ordinal);
             readyActions = false;
+            nameSelection = spacePlayerChoices;
             if (pairing) layoutInitialized = false;
             ApplyPlayerSkin(usePlayerSkin);
             SetFullPanelVisible(true);
@@ -222,7 +226,7 @@ namespace KinoVR
                 {
                     if (first[i] != second[i]) return false;
                 }
-                else if (!string.Equals(first[i].Label, second[i].Label, StringComparison.Ordinal) || first[i].Enabled != second[i].Enabled)
+                else if (!string.Equals(first[i].Label, second[i].Label, StringComparison.Ordinal) || first[i].Enabled != second[i].Enabled || first[i].IsUtility != second[i].IsUtility)
                     return false;
             }
             return true;
@@ -231,14 +235,23 @@ namespace KinoVR
         void RenderPage()
         {
             int count = currentChoices?.Count ?? 0;
-            int pageSize = playerSkin ? PlayerPageSize : PageSize;
+            int pageSize = nameSelection ? PlayerPageSize : playerSkin ? BrandedPageSize : PageSize;
             int pages = Mathf.Max(1, (count + pageSize - 1) / pageSize);
             page = Mathf.Clamp(page, 0, pages - 1);
+            int visibleUtilities = 0, utilityIndex = 0;
+            if (nameSelection)
+                for (int i = page * pageSize; i < Mathf.Min(count, (page + 1) * pageSize); i++)
+                    if (currentChoices[i] != null && currentChoices[i].IsUtility) visibleUtilities++;
             for (int i = 0; i < rows.Count; i++)
             {
                 int index = page * pageSize + i;
                 if (i >= pageSize || index >= count || currentChoices[index] == null) { rows[i].Conceal(); continue; }
                 var choice = currentChoices[index];
+                // Keep utility actions at the bottom even with no registered players.
+                // Three rows leave at least 61 mm between names and these controls.
+                float y = playerSkin ? -15 - i * (nameSelection ? 70 : 58) : 111 - i * 59;
+                if (nameSelection && choice.IsUtility) y = -195 + (visibleUtilities - 1 - utilityIndex++) * 70;
+                PositionButton(rows[i], new Vector2(0, y), new Vector2(554, playerSkin ? 49 : 51));
                 // Resolve the current list at click time, including callbacks refreshed by polling.
                 rows[i].Configure(choice.Label, () => Select(index), choice.Enabled);
                 rows[i].Reveal();

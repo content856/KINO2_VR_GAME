@@ -385,10 +385,10 @@ namespace KinoVR
             if (!visible) return;
             visible = false; panel?.Hide(); var action = completed; completed = null; action?.Invoke();
         }
-        KinoBackendChoice Choice(string label, Action action, bool enabled = true)
+        KinoBackendChoice Choice(string label, Action action, bool enabled = true, bool isUtility = false)
         {
             int captured = generation;
-            return new KinoBackendChoice(label, () => { if (visible && !Busy && captured == generation) action(); }, enabled);
+            return new KinoBackendChoice(label, () => { if (visible && !Busy && captured == generation) action(); }, enabled, isUtility);
         }
         void Show(string heading, string text, List<KinoBackendChoice> options)
         { if (visible && panel) panel.Show(heading, text, options, store != null ? store.name : campaign?.name); }
@@ -423,8 +423,8 @@ namespace KinoVR
                 return;
             }
             var options = Players.Select(p => Choice(p.nickname, () => ChoosePlayer(p.registration_id))).ToList();
-            options.Add(Choice("Ανανέωση λίστας", () => { nextPoll = 0; }));
-            options.Add(Choice("Ρυθμίσεις καταστήματος", () => { operatorMenu = true; DrawPlayers(); }));
+            options.Add(Choice("Ανανέωση λίστας", () => { nextPoll = 0; }, isUtility: true));
+            options.Add(Choice("Ρυθμίσεις καταστήματος", () => { operatorMenu = true; DrawPlayers(); }, isUtility: true));
             if (panel) panel.ShowPlayerSelection("ΕΠΙΛΕΞΕ ΤΟ ΟΝΟΜΑ ΣΟΥ", status, options, store != null ? store.name : campaign?.name);
         }
         void DrawError()
