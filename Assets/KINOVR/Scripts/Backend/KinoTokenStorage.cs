@@ -16,8 +16,15 @@ namespace KinoVR
         public bool refreshInFlight;
     }
 
+    public interface IKinoTokenStorage
+    {
+        bool TryLoad(out KinoStoredTokens value, out string error);
+        bool TrySave(KinoStoredTokens value, out string error);
+        bool TryClear(out string error);
+    }
+
     /// <summary>Android Keystore at rest; deliberately memory-only in the Editor/desktop.</summary>
-    public sealed class KinoTokenStorage
+    public sealed class KinoTokenStorage : IKinoTokenStorage
     {
         const string JavaClass = "com.kinovr.securestorage.KinoSecureStorage";
         static readonly Dictionary<string, string> SessionPayloads = new Dictionary<string, string>();

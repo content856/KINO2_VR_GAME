@@ -30,9 +30,20 @@ Receipts and rejected results remain under `Application.persistentDataPath/KinoB
 Refresh tokens rotate once; an interrupted rotation requires a new pairing code rather than unsafe
 reuse of the old refresh token.
 
+Temporary credential-storage reads retry with backoff (up to 30 seconds) and retry immediately
+on resume or the operator's Retry action. They show connection recovery, not a new pairing keypad.
+A storage failure before sending refresh preserves the current credentials and retries safely.
+An exchange that was sent but has an unknown outcome still requires pairing; its single-use token
+must not be replayed. Authentication metadata (UTC, app build, device ID, expiry timestamps,
+HTTP status and local failure stage) is recorded in `KinoBackend/authentication.jsonl` under
+`Application.persistentDataPath`, with one bounded previous log. Tokens and response bodies are
+never logged. Physical Quest sleep/restart/update acceptance is still required.
+
 Validation menus:
 
 - **Tools → KINO VR → Backend → Validate API authentication rules** checks token, URL and retry rules.
+  It also tests temporary storage failures, resume/reload, safe pre-send recovery, interrupted
+  rotation and diagnostic privacy. Batch entry: `KinoVR.Editor.KinoApiClientTests.RunBatch`.
 - **Tools → KINO VR → Backend → Test visitor and score lifecycle** exercises the coordinator against
   an in-memory API in an isolated scene. It never contacts the live service. Results are written to
   `Artifacts/KinoBackend/lifecycle-tests.txt`.

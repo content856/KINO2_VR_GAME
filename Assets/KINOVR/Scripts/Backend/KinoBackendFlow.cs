@@ -34,6 +34,7 @@ namespace KinoVR
         KinoApiStore store;
         string region, pairingCode = "", status = "";
         bool initialized, visible, contextChecked, recovering, storageFailed, terminalError, loadingPlayers, operatorMenu;
+        bool restoringPairing;
         int generation, failures;
         double retryAt, nextPoll, serverRetryAt;
         KinoSequenceStep step;
@@ -90,7 +91,22 @@ namespace KinoVR
             if (!visible || Busy) return;
             if (Now < retryAt) { DrawError(); return; }
             if (storageFailed) { DrawWaiting("Αδυναμία τοπικής αποθήκευσης. Ζήτησε βοήθεια από το προσωπικό."); return; }
-            if (!api.IsPaired) { contextChecked = false; StoreReady = false; ShowPairing(); return; }
+            if (!api.IsPaired)
+            {
+                contextChecked = false; StoreReady = false;
+                if (api.CanRetryTokenStorage)
+                {
+                    restoringPairing = true;
+                    ErrorCode = api.LastErrorCode;
+                    Show("ΕΠΑΝΑΦΟΡΑ ΣΥΝΔΕΣΗΣ", "Η αποθηκευμένη σύνδεση δεν διαβάστηκε. Γίνεται νέα προσπάθεια…",
+                        new List<KinoBackendChoice> { Choice("Δοκιμή ξανά", () => { api.RetryTokenStorage(); Retry(); }) });
+                    return;
+                }
+                restoringPairing = false;
+                ErrorCode = api.LastErrorCode ?? ErrorCode;
+                ShowPairing(); return;
+            }
+            if (restoringPairing) { restoringPairing = false; ResetError(); }
             if (!contextChecked) { Run(LoadContext()); return; }
             if (transaction != null && (recovering || transaction.pendingScore || transaction.needsAbandon))
             {
@@ -440,7 +456,11 @@ namespace KinoVR
         void ShowPairing()
         {
             if (!visible || !panel) return;
-            panel.ShowPairing(pairingCode, string.IsNullOrEmpty(ErrorCode) ? "Βάλε τον κωδικό από το admin: Devices → Pairing code." : "Η σύνδεση δεν ολοκληρώθηκε. Έλεγξε το δίκτυο και βάλε νέο pairing code.",
+            string pairingStatus = string.IsNullOrEmpty(ErrorCode) ? "Βάλε τον κωδικό από το admin: Devices → Pairing code." :
+                ErrorCode == "REFRESH_INTERRUPTED" ? "Η ανανέωση διακόπηκε. Χρειάζεται νέος κωδικός σύνδεσης." :
+                ErrorCode == "PAIRING_INVALID" ? "Η αποθηκευμένη σύνδεση δεν είναι έγκυρη. Βάλε νέο κωδικό." :
+                "Χρειάζεται νέος κωδικός σύνδεσης από το admin.";
+            panel.ShowPairing(pairingCode, pairingStatus,
                 key => { if (!Busy && pairingCode.Length < 8 && char.IsLetterOrDigit(key)) { pairingCode += char.ToUpperInvariant(key); ShowPairing(); } },
                 () => { if (!Busy && pairingCode.Length > 0) { pairingCode = pairingCode.Substring(0, pairingCode.Length - 1); ShowPairing(); } },
                 () => { if (!Busy && pairingCode.Length == 8) Run(Pair()); });

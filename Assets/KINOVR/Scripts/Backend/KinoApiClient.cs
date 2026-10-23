@@ -49,13 +49,18 @@ namespace KinoVR
         public string LastErrorCode { get; private set; }
         public string LastErrorMessage { get; private set; }
         public string TokenStorageMode => KinoTokenStorage.Mode;
+        public bool CanRetryTokenStorage => !loadSucceeded && LastErrorCode == "TOKEN_STORAGE_FAILED";
 
-        KinoTokenStorage storage;
+        IKinoTokenStorage storage;
         KinoApiTokenPair tokens;
         string loadedBase;
         bool loadSucceeded, refreshing, activating;
         int credentialVersion;
         KinoApiResult<KinoApiTokenPair> lastRefresh;
+        double storageRetryAt, storageRetryDelay = 1;
+
+        protected virtual IKinoTokenStorage CreateTokenStorage(string endpoint) => new KinoTokenStorage(endpoint);
+        protected virtual double AuthenticationClock => Time.realtimeSinceStartupAsDouble;
 
         // Lazy loading permits changing apiBaseUrl after AddComponent. Credentials are scoped
         // to the complete normalized endpoint and never migrated to another host/environment.
@@ -63,27 +68,58 @@ namespace KinoVR
         {
             if (!KinoApiRules.TryNormalizeBaseUrl(apiBaseUrl, out var normalized))
             { SetError("INVALID_API_URL", "Use an HTTPS API URL (HTTP is allowed only for loopback tests)."); return false; }
-            if (loadedBase == normalized) return loadSucceeded;
+            if (loadedBase == normalized && (loadSucceeded || AuthenticationClock < storageRetryAt)) return loadSucceeded;
             if (refreshing || activating)
             { SetError("AUTH_BUSY", "Wait for the current pairing operation before changing the API URL."); return false; }
-            loadedBase = normalized; tokens = null; Context = null; credentialVersion++;
-            storage = new KinoTokenStorage(normalized);
+            if (loadedBase != normalized)
+            {
+                loadedBase = normalized; tokens = null; Context = null; credentialVersion++;
+                storage = CreateTokenStorage(normalized);
+                storageRetryAt = 0; storageRetryDelay = 1;
+            }
             loadSucceeded = storage.TryLoad(out var saved, out var error);
-            if (!loadSucceeded) { SetError("TOKEN_STORAGE_FAILED", error); return false; }
-            if (saved == null) { ClearError(); return true; }
+            if (!loadSucceeded)
+            {
+                storageRetryAt = AuthenticationClock + storageRetryDelay;
+                storageRetryDelay = Math.Min(30, storageRetryDelay * 2);
+                SetError("TOKEN_STORAGE_FAILED", error);
+                TraceAuth("storage_read_failed", LastErrorCode);
+                return false;
+            }
+            storageRetryAt = 0; storageRetryDelay = 1;
+            if (saved == null) { ClearError(); TraceAuth("pairing_not_found"); return true; }
             if (saved.refreshInFlight)
-            { SetError("REFRESH_INTERRUPTED", "A token exchange was interrupted. Pair this headset again."); return true; }
+            { SetError("REFRESH_INTERRUPTED", "A token exchange was interrupted. Pair this headset again."); TraceAuth("stored_pairing_blocked", LastErrorCode, saved: saved); return true; }
             if (saved.apiBaseUrl != normalized || !KinoApiRules.ValidTokens(saved.tokens))
-            { SetError("PAIRING_INVALID", "Stored pairing is invalid. Pair this headset again."); return true; }
+            { SetError("PAIRING_INVALID", "Stored pairing is invalid. Pair this headset again."); TraceAuth("stored_pairing_invalid", LastErrorCode); return true; }
             if (KinoApiRules.ExpiresSoon(saved.tokens.refresh_token_expires_at, DateTimeOffset.UtcNow, 0))
-            { SetError("REFRESH_TOKEN_INVALID", "Pairing has expired. Pair this headset again."); return true; }
-            tokens = saved.tokens; Context = tokens.context; ClearError(); return true;
+            { SetError("REFRESH_TOKEN_INVALID", "Pairing has expired. Pair this headset again."); TraceAuth("stored_pairing_expired", LastErrorCode, saved: saved); return true; }
+            tokens = saved.tokens; Context = tokens.context; ClearError(); TraceAuth("pairing_loaded"); return true;
         }
+
+        public bool RetryTokenStorage()
+        {
+            if (refreshing || activating || !CanRetryTokenStorage) return false;
+            storageRetryAt = 0;
+            return EnsureLoaded();
+        }
+
+        void OnApplicationPause(bool paused)
+        {
+            TraceAuth(paused ? "app_paused" : "app_resumed", LastErrorCode);
+            // A temporary Keystore/read failure must not become a permanent logout.
+            // Keep loaded credentials and any in-flight exchange intact across sleep.
+            if (!paused && !loadSucceeded) storageRetryAt = 0;
+        }
+
+        void TraceAuth(string action, string code = null, long status = 0, KinoStoredTokens saved = null, bool? inFlight = null) =>
+            KinoAuthDiagnostics.Write(action, code, status, loadedBase, saved?.tokens ?? tokens, inFlight ?? saved?.refreshInFlight ?? refreshing);
 
         public virtual bool ForgetPairing()
         {
             if (refreshing || activating) { SetError("AUTH_BUSY", "Wait for the current pairing operation."); return false; }
             EnsureLoaded();
+            TraceAuth("pairing_forgotten");
             tokens = null; Context = null; credentialVersion++;
             if (storage != null && !storage.TryClear(out var error)) { SetError("TOKEN_STORAGE_FAILED", error); return false; }
             ClearError(); return true;
@@ -95,6 +131,8 @@ namespace KinoVR
             if (!KinoApiRules.TryNormalizeBaseUrl(apiBaseUrl, out var endpoint))
             { done?.Invoke(Failure<KinoApiTokenPair>("INVALID_API_URL", "Use an HTTPS API URL.")); yield break; }
             EnsureLoaded();
+            if (!loadSucceeded && LastErrorCode == "TOKEN_STORAGE_FAILED")
+            { done?.Invoke(Failure<KinoApiTokenPair>(LastErrorCode, LastErrorMessage)); yield break; }
             if (storage == null || loadedBase != endpoint)
             { done?.Invoke(Failure<KinoApiTokenPair>("TOKEN_STORAGE_FAILED", "Secure pairing storage is unavailable.")); yield break; }
             if (string.IsNullOrWhiteSpace(code))
@@ -110,8 +148,10 @@ namespace KinoVR
                     result = Failure<KinoApiTokenPair>("TOKEN_STORAGE_FAILED", error);
                 else
                 {
+                    TraceAuth("activation_sending", inFlight: true);
                     yield return Send<KinoApiTokenPair>(endpoint, "POST", "/devices/activate",
                         new KinoApiActivateRequest { pairing_code = code.Trim().ToUpperInvariant() }, null, value => result = value);
+                    TraceAuth("activation_response", result.Code, result.Status, inFlight: true);
                     if (result.Success) result = AcceptTokens(result, endpoint);
                     else
                     {
@@ -130,7 +170,7 @@ namespace KinoVR
         {
             while (activating || refreshing) yield return null;
             if (!EnsureLoaded())
-            { done?.Invoke(Failure<T>(LastErrorCode, LastErrorMessage)); yield break; }
+            { done?.Invoke(KinoApiResult<T>.Fail(LastErrorCode, LastErrorMessage, 401, LastErrorCode == "TOKEN_STORAGE_FAILED")); yield break; }
             if (tokens == null)
             { done?.Invoke(Failure<T>(LastErrorCode ?? "PAIRING_REQUIRED", LastErrorMessage ?? "Pair this headset first.")); yield break; }
             if (relativePath == "/auth/refresh" || relativePath == "/devices/activate")
@@ -168,7 +208,10 @@ namespace KinoVR
             else
             {
                 if (result.Status == 401 && KinoApiRules.RequiresPairing(result.Code) && usedVersion == credentialVersion)
+                {
+                    TraceAuth("request_auth_rejected", result.Code, result.Status);
                     InvalidatePairing();
+                }
                 SetError(result.Code, result.Message);
             }
             done?.Invoke(result);
@@ -193,20 +236,26 @@ namespace KinoVR
             {
                 if (KinoApiRules.ExpiresSoon(tokens.refresh_token_expires_at, DateTimeOffset.UtcNow, 0))
                 {
+                    TraceAuth("refresh_expired_locally", "REFRESH_TOKEN_INVALID");
                     InvalidatePairing();
                     lastRefresh = Failure<KinoApiTokenPair>("REFRESH_TOKEN_INVALID", "Pairing has expired. Pair this headset again.");
                 }
                 else if (!storage.TrySave(new KinoStoredTokens { apiBaseUrl = endpoint, tokens = tokens, refreshInFlight = true }, out var error))
                 {
-                    tokens = null; Context = null; credentialVersion++;
-                    lastRefresh = Failure<KinoApiTokenPair>("TOKEN_STORAGE_FAILED", error);
+                    // Nothing was sent: the current refresh token is still safe to use.
+                    // Preserve it and retry saving the durable marker before any exchange.
+                    SetError("TOKEN_STORAGE_FAILED", error);
+                    lastRefresh = KinoApiResult<KinoApiTokenPair>.Fail(LastErrorCode, error, 0, true);
+                    TraceAuth("refresh_not_sent_storage_failed", LastErrorCode, inFlight: false);
                 }
                 else
                 {
                     var request = new KinoApiRefreshRequest { refresh_token = tokens.refresh_token };
                     // The durable marker is present before sending. No retry of this request,
                     // including after a timeout/429/5xx: its token may already be consumed.
+                    TraceAuth("refresh_sending");
                     yield return Send<KinoApiTokenPair>(endpoint, "POST", "/auth/refresh", request, null, value => lastRefresh = value);
+                    TraceAuth("refresh_response", lastRefresh.Code, lastRefresh.Status);
                     if (lastRefresh.Success) lastRefresh = AcceptTokens(lastRefresh, endpoint);
                     else
                     {
@@ -229,6 +278,7 @@ namespace KinoVR
         {
             if (!KinoApiRules.ValidTokens(result.Value))
             {
+                TraceAuth("token_response_invalid", "INVALID_TOKEN_RESPONSE", result.Status);
                 tokens = null; Context = null; credentialVersion++;
                 return Failure<KinoApiTokenPair>("INVALID_TOKEN_RESPONSE", "The service did not return a valid Quest token pair. Pair again.", result.Status);
             }
@@ -236,17 +286,20 @@ namespace KinoVR
             if (next.context == null) next.context = Context;
             if (!storage.TrySave(new KinoStoredTokens { apiBaseUrl = endpoint, tokens = next }, out var error))
             {
+                TraceAuth("new_tokens_save_failed", "TOKEN_STORAGE_FAILED", result.Status);
                 tokens = null; Context = null; credentialVersion++;
                 return Failure<KinoApiTokenPair>("TOKEN_STORAGE_FAILED", error);
             }
             // Saving the new refresh token must succeed before the access token is used.
             tokens = next; Context = next.context; credentialVersion++; loadSucceeded = true; ClearError();
+            TraceAuth("tokens_saved", status: result.Status, inFlight: false);
             return result;
         }
 
         bool SameEndpoint(string endpoint) => KinoApiRules.TryNormalizeBaseUrl(apiBaseUrl, out var current) && current == endpoint && loadedBase == endpoint;
         void InvalidatePairing()
         {
+            TraceAuth("pairing_invalidated");
             tokens = null; Context = null; credentialVersion++;
             // Persist a tombstone rather than allowing an interrupted clear to restore tokens.
             storage?.TrySave(new KinoStoredTokens { apiBaseUrl = loadedBase, refreshInFlight = true }, out _);
@@ -259,9 +312,9 @@ namespace KinoVR
             // This is an authentication preflight failure, not the status of the caller's
             // score/start operation (which was not sent with the failed credentials).
             // In particular refresh 429/422 must never be mistaken for a rejected score.
-            KinoApiResult<T>.Fail(value.Code, value.Message, 401, false, value.RetryAfterSeconds);
+            KinoApiResult<T>.Fail(value.Code, value.Message, 401, value.Retryable, value.RetryAfterSeconds);
 
-        IEnumerator Send<T>(string endpoint, string method, string relativePath, object body, string accessToken,
+        protected virtual IEnumerator Send<T>(string endpoint, string method, string relativePath, object body, string accessToken,
             Action<KinoApiResult<T>> done) where T : class
         {
             if (string.IsNullOrEmpty(relativePath) || !relativePath.StartsWith("/", StringComparison.Ordinal) ||
