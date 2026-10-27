@@ -1,0 +1,13 @@
+{
+  "source": "D:\\KINO2_VR_GAME\\SourceArt\\Skyboxes\\Athens-ReadySky-20261027\\Athens-ColorMatched-14400x7200.png",
+  "asset": "D:\\KINO2_VR_GAME\\Assets\\KinoRotunda\\Textures\\Panoramas\\AthensColorMatched\\AthensColorMatched.png",
+  "beforeBytes": 135328787,
+  "afterBytes": 50416313,
+  "dimensions": [
+    8192,
+    4096
+  ],
+  "sourceMasterPreserved": true,
+  "textureMetadataUnchanged": true,
+  "method": "Lanczos downsample to the existing 8K Unity import limit; lossless RGB PNG."
+}

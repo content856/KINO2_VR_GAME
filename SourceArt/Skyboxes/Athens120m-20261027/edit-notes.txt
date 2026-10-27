@@ -1,0 +1,12 @@
+Athens 120m panorama edit - 2026-10-27
+
+Deliverable: Athens120m-edited-14400x7200.png (lossless PNG).
+Preview: Athens120m-edited-preview.jpg.
+
+The city is the original 14400 x 7200 photograph, at its original pixel coordinates. Saturation, contrast and warm/cool color adjustments are pointwise RGB transforms. No generative model was used to create or alter the city in the deliverable.
+
+A separate, original sky-only layer was created with the built-in image generation tool from the text in sky-prompt.txt. No previous skybox image was supplied to this sky-only generation and no pixels from that previous skybox are used in the deliverable. The generated sky layer has a lower native resolution and is resized and composited onto the full-resolution photograph. It is not native 14K photographic sky detail.
+
+The original terrain silhouette was masked, the sky was positioned to match the original sun direction, its wrap seam and zenith were smoothed, and original bright atmospheric haze was warmed near the sun. Building detail at native resolution is shown in building-detail-100-percent.png. verification.json records checks against the original pointwise city color transform.
+
+The original photograph and current Unity skybox/material were not overwritten. This folder also contains intermediate previews and masks; sky-edit-generated.png is an earlier rejected whole-image experiment and is NOT used in the deliverable.

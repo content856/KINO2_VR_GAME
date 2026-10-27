@@ -1,0 +1,15 @@
+{
+  "dimensions": [
+    14400,
+    7200
+  ],
+  "anyChannelAtLimitFraction": 0.02209981674382716,
+  "reference": "D:\\KINO2_VR_GAME\\SourceArt\\Skyboxes\\Athens120m-20261027\\reference-preview.png",
+  "source": "Athens-ReadySky-14400x7200.png",
+  "operation": "Color transformations only; no geometric changes or generated pixels.",
+  "output": "Athens-ColorMatched-14400x7200.png",
+  "savedPngDecoded": true,
+  "nativeBuildingCropColorTransformMaxError": 1,
+  "nativeBuildingCropPixels": 960000,
+  "fileBytes": 135328787
+}

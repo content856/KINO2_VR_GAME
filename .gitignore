@@ -105,3 +105,13 @@ InitTestScene*.unity*
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
 /Artifacts
+
+# Local skybox masters, downloaded candidates and image-processing previews.
+# Runtime textures are versioned under Assets/KinoRotunda/Textures/Panoramas.
+/SourceArt/Skyboxes/**/*.png
+/SourceArt/Skyboxes/**/*.jpg
+/SourceArt/Skyboxes/**/*.jpeg
+/SourceArt/Skyboxes/**/*.hdr
+/SourceArt/Skyboxes/**/*.exr
+/outputs/athensNoSy-preview.png
+/outputs/sky-matte-qa/

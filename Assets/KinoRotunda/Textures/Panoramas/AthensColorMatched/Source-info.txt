@@ -1,0 +1,11 @@
+Athens Color Matched Skybox
+City: user-supplied athensNoSy.png.
+Sky: Kloppenheim 06 (Pure Sky), Poly Haven, Greg Zaal / Jarod Guest.
+https://polyhaven.com/a/kloppenheim_06_puresky
+Sky license: CC0 https://polyhaven.com/license
+Non-generative composite and color match, 2026-10-27.
+Full-resolution master and processing: SourceArt/Skyboxes/Athens-ReadySky-20261027.
+Imported sRGB at 8192x4096, ASTC 4x4 Android / BC7 desktop.
+Versioned PNG is stored at 8192x4096 to stay below the Git file-size limit.
+The 14400x7200 master and intermediate images remain local, excluded from Git.
+Material exposure 1 reproduces the approved color grade.

@@ -1,0 +1,23 @@
+Color-matched Athens panorama — 2026-10-27
+
+Final: Athens-ColorMatched-14400x7200.png
+Preview: Athens-ColorMatched-preview.jpg
+Comparison: Athens-ColorMatched-side-by-side.jpg
+
+Reference: ../Athens120m-20261027/reference-preview.png, the previous project's Athens skybox.
+Source: Athens-ReadySky-14400x7200.png, the already-composited Poly Haven photographic sky.
+
+This edition changes colors only. The photograph, cloud shapes, buildings, original pixel
+coordinates, panorama dimensions, and horizon matte are preserved. No generative tool used.
+
+The grade matches the reference's deeper cyan-blue sky, amber cloud highlights, cooler city
+midtones and warm sunlit facades. Low-chroma architecture is balanced using measured RGB
+differences grouped by luminance. Saturated foliage is protected from this neutral-tone correction.
+
+The side-by-side comparison aligns the sun horizontally and shows matching angular vertical
+coverage. These display crops and yaw adjustments apply only to the comparison board.
+The final 14400 x 7200 output keeps its original framing and orientation.
+
+The previous full-resolution version and all Unity assets remain unchanged.
+Source, licensing and download details remain in source-notes.txt.
+Reproducible processing: match_reference_colors.py --final

@@ -1,0 +1,22 @@
+Athens panorama with a ready-made photographic sky, 2026-10-27
+
+Final: Athens-ReadySky-14400x7200.png
+Preview: Athens-ReadySky-preview.jpg
+
+City source: user-supplied athensNoSy.png, 14400 x 7200 RGBA.
+Sky: Kloppenheim 06 (Pure Sky), Poly Haven.
+https://polyhaven.com/a/kloppenheim_06_puresky
+Original photography: Greg Zaal. Sky edits: Jarod Guest.
+License for sky asset: CC0, https://polyhaven.com/license
+Download: https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/kloppenheim_06_puresky.jpg
+Sky JPEG dimensions: 8192 x 4096, resized for the 14400 x 7200 composite.
+Original sky JPEG MD5: 958a8792cecb20d602dab110ebc23e06
+
+No generative image tools or generated images were used in this composite.
+The city keeps its original coordinates and RGB beyond the narrow skyline blending band.
+The supplied alpha is retained at the skyline to avoid exposing erased pixels.
+Residual old clouds above the geographic skyline are removed using the existing traced matte.
+The photographic sky is rotated to the original sunlight, aligned vertically, and adjusted in saturation/contrast.
+
+The original user file and Unity scenes, materials and assets are unchanged.
+compose_ready_sky.py and verification-ReadySky.json record processing and pixel verification.

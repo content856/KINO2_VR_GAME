@@ -1,0 +1,33 @@
+{
+  "output": "D:\\KINO2_VR_GAME\\SourceArt\\Skyboxes\\Athens-ReadySky-20261027\\Athens-ReadySky-14400x7200.png",
+  "dimensions": [
+    14400,
+    7200
+  ],
+  "citySource": "C:\\Users\\Yannis\\OneDrive\\Υπολογιστής\\athensNoSy.png",
+  "skySource": "D:\\KINO2_VR_GAME\\SourceArt\\Skyboxes\\Athens-ReadySky-20261027\\kloppenheim_06_puresky.jpg",
+  "skyPage": "https://polyhaven.com/a/kloppenheim_06_puresky",
+  "skyLicense": "CC0: https://polyhaven.com/license",
+  "method": "Photographic sky asset, cyclic yaw, vertical sun alignment, sky-only color adjustment, geographic skyline matte; no image generation.",
+  "sourceSkyDimensions": [
+    8192,
+    4096
+  ],
+  "cityOpaquePixelsChecked": 51565691,
+  "changedCityOpaquePixels": 0,
+  "parameters": {
+    "sky": "kloppenheim_06_puresky",
+    "source_sun_x": 0.615,
+    "source_sun_y": 0.47,
+    "target_sun_x": 0.914,
+    "target_sun_y": 0.465,
+    "saturation": 1.27,
+    "contrast": 1.12,
+    "width": 14400,
+    "name": "ReadySky",
+    "final": true
+  },
+  "citySha256": "a3879f684a6159a5a1aa9a8670a77e9ca61dab920a3821b96a59a3592cf084be",
+  "skySha256": "4084ddd6c57d76e05ac7de9f563077aabd77d07f6b03593d0930a3fc515494b4",
+  "outputSha256": "b676dcb30ca571b69dacae42ceff8c3eb6acc8c5e167678768b0f0fe25fec929"
+}

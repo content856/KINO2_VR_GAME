@@ -1,0 +1,13 @@
+{
+  "width": 14400,
+  "height": 7200,
+  "skyPixels": 50956614,
+  "foregroundPixels": 52640485,
+  "citySource": "original photograph, same coordinates; color transform only",
+  "skySource": "new sky-only generated image; previous skybox pixels not used",
+  "originalPath": "C:/Users/Yannis/OneDrive/Υπολογιστής/Athens 120m.JPG",
+  "originalSha256": "488617f70e92b458d9ffe355b566186583d124d68c1eb21ae28c3a4635a7650d",
+  "method": "Non-generative composite and RGB color grading of the original city; generation used only for an independent sky layer.",
+  "sunHorizontalShift": 0.041,
+  "skyVerticalScale": 0.85
+}

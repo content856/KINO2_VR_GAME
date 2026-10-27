@@ -1,0 +1,13 @@
+{
+  "width": 14400,
+  "height": 7200,
+  "format": "png",
+  "bytes": 155090868,
+  "foregroundSamplePixels": 147810,
+  "maxDifferenceFromOriginalPointwiseColorTransform": 0,
+  "originalSkyLayer": {
+    "width": 1774,
+    "height": 887
+  },
+  "sourceCityResampled": false
+}

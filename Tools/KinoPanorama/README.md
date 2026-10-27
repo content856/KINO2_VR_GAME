@@ -18,9 +18,15 @@ For the Athens cropped LDR sky, **Tools > KINO Rotunda > Use full-resolution LDR
 
 ## Selected Athens panorama
 
+The active KinoRotunda sky now uses `Assets/KinoRotunda/Textures/Panoramas/AthensColorMatched/Skybox.mat` (2026-10-27). It combines the user-supplied `athensNoSy.png` city with [Kloppenheim 06 (Pure Sky), Poly Haven](https://polyhaven.com/a/kloppenheim_06_puresky), a CC0 photographic sky by Greg Zaal / Jarod Guest. Its colors were matched to the previous project panorama without image generation.
+
+The 14,400 × 7,200 master and reproducible image processing are in `SourceArt/Skyboxes/Athens-ReadySky-20261027`. Source images, downloaded candidates and processing previews remain local and are excluded from Git. The versioned runtime PNG is resized to 8192 × 4096, the existing Unity import limit, so the project does not require Git LFS for this skybox. Unity samples the sRGB PNG directly, with mipmaps, horizontal repeat, vertical clamp, BC7 on desktop and ASTC 4x4 on Android. The full 360 × 180° image uses `Skybox/Panoramic`, exposure 1 and yaw 267.04°. Its sun is aligned horizontally with the unchanged scene sun (photo elevation 6.3°, scene elevation 6.06°). Existing baked lighting and reflection maps were retained. The old material and source remain available; application report, scene backup and native Unity renders are in `Artifacts/KinoRotunda/Panorama/AthensColorMatched-20261027`.
+
+## Previous Athens panorama
+
 [Sunset over Syntagma Square drone aerial view, Athens, Greece — FOTO360](https://www.360cities.net/image/sunset-over-syntagma-square-drone-aerial-view-athens-greece), advertised resolution 17,966 × 8,983.
 
-The current scene uses the user-supplied `Artifacts/athens_panorama_20260921/athens_panorama.png` strip (8192 × 2131). Its photographed sun is picked at approximately pixel (4555, 1300), measured from the top left. The strip covers 93.64746° vertically; its bottom is calibrated to -30.45856° for the existing 6.06° scene sun. The scene light itself remains unchanged. Uncaptured poles are a colour gradient, not additional photographed coverage. `athens-apply.json` records the reusable import settings.
+The previous scene sky used the user-supplied `Artifacts/athens_panorama_20260921/athens_panorama.png` strip (8192 × 2131). Its photographed sun is picked at approximately pixel (4555, 1300), measured from the top left. The strip covers 93.64746° vertically; its bottom is calibrated to -30.45856° for the existing 6.06° scene sun. Uncaptured poles are a colour gradient, not additional photographed coverage. `athens-apply.json` records those previous import settings.
 
 ## Validation and automation
 
